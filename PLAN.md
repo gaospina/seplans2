@@ -4,7 +4,7 @@ Prototype web application that computes how a French estate is split between hei
 and the inheritance tax each heir owes. The legal reasoning lives in Prolog; Spring Boot
 provides the web layer and a bridge to the Prolog engine.
 
-Status: iteration 0 (repository scaffold). Nothing below is implemented yet.
+Status: iteration 1 is implemented (see README.md for what works). Iterations 2–5 are not started.
 
 ## 1. Architecture
 
@@ -47,15 +47,18 @@ taking the place of a predeceased child) and the paternal/maternal split need to
 - `id`, `name`
 - `relation`: spouse, PACS partner, child, grandchild, father, mother, sibling,
   nephew/niece, grandparent, uncle/aunt, cousin, other
-- `alive`: yes/no (predeceased relatives are listed so their descendants can represent them)
+- `alive`: yes/no (predeceased relatives are listed so their descendants can represent them);
+  arrives with representation in iteration 2 — iteration 1 lists living relatives only
 - `via`: the id of the relative who links this person to the deceased, when relevant
   (e.g. the grandchild's parent)
 - for a child: `commonChild` — whether the child is also the surviving spouse's child
-- for the spouse: `age`, and `option` (usufruct or quarter) when all children are common
+- for the succession: `spouseAge`, and `spouseOption` (usufruct or quarter) when all
+  children are common
 - later iterations: `line` (paternal/maternal), `disabled`, `renounces`
 
-The service turns this into Prolog facts (`person/2`, `parent_of/2`, `predeceased/1`,
-`spouse/1`, `estate/1`), and the rules derive everything else.
+The service turns this into Prolog facts (iteration 1: `estate_cents/1`, `person/2`,
+`common_child/1`, `spouse_age/1`, `spouse_option/1`; later `parent_of/2`, `predeceased/1`),
+and the rules derive everything else.
 
 ### Output model
 

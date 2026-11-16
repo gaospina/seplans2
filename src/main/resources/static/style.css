@@ -1,0 +1,82 @@
+:root {
+  --text: #1c2430;
+  --muted: #5d6b7c;
+  --line: #d5dbe3;
+  --surface: #f5f7fa;
+  --accent: #1f5fae;
+  --error-bg: #fdecec;
+  --error-text: #8a1f1f;
+  --info-bg: #fff6dd;
+  --info-text: #6b4e00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: #fff;
+}
+
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+
+h1 { font-size: 1.7rem; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; margin: 0 0 8px; }
+h3 { font-size: 1rem; margin: 20px 0 6px; }
+.lead { color: var(--muted); margin: 0 0 24px; }
+.hint { color: var(--muted); font-size: 0.875rem; margin: 4px 0 0; }
+
+form > section, #result {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+label { display: block; font-weight: 600; margin-bottom: 4px; }
+label.choice { font-weight: 400; margin: 4px 0; }
+
+input[type="number"], input[type="text"], select {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  max-width: 100%;
+}
+#estate { width: 220px; }
+#spouse-age { width: 100px; }
+#age-block { margin-top: 12px; }
+
+button {
+  font: inherit;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+button[type="submit"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button.remove { padding: 4px 10px; }
+button:disabled { opacity: 0.6; cursor: default; }
+
+table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tfoot td { font-weight: 600; border-bottom: none; }
+tr.not-heir td { color: var(--muted); }
+#persons input[type="text"] { width: 100%; min-width: 120px; }
+.scroll { overflow-x: auto; }
+
+#message { padding: 10px 14px; border-radius: 8px; margin: 0 0 16px; }
+#message.error { background: var(--error-bg); color: var(--error-text); }
+#message.info { background: var(--info-bg); color: var(--info-text); }
+
+#reasons { margin: 0; padding-left: 20px; }
+#reasons li { margin-bottom: 6px; }
+
+footer { color: var(--muted); font-size: 0.875rem; margin-top: 24px; }

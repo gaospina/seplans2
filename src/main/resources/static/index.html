@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seplans — French inheritance split</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <h1>French inheritance split</h1>
+  <p class="lead">Enter the net estate and the living relatives of the deceased. The rules
+    (Code civil and CGI) are evaluated by a Prolog program.</p>
+
+  <form id="form" novalidate>
+    <section>
+      <label for="estate">Net estate (€)</label>
+      <input id="estate" type="number" min="0.01" step="0.01" inputmode="decimal" required>
+      <p class="hint">After debts and after the matrimonial regime has been settled.</p>
+    </section>
+
+    <section>
+      <h2>Relatives</h2>
+      <p class="hint">List living relatives only. This version handles the spouse, children,
+        father and mother. A child who died before the deceased and left descendants is not
+        handled yet.</p>
+      <table id="persons">
+        <thead>
+          <tr><th>Name</th><th>Relationship</th><th>Also the spouse's child</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button type="button" id="add">Add a relative</button>
+    </section>
+
+    <section id="spouse-section" hidden>
+      <h2>Surviving spouse</h2>
+      <div id="option-block">
+        <p>All children are common to the couple, so the spouse chooses:</p>
+        <label class="choice"><input type="radio" name="option" value="USUFRUCT">
+          Usufruct of the whole estate</label>
+        <label class="choice"><input type="radio" name="option" value="QUARTER">
+          One quarter in full ownership</label>
+      </div>
+      <div id="age-block">
+        <label for="spouse-age">Spouse's age</label>
+        <input id="spouse-age" type="number" min="0" max="130" step="1">
+        <p class="hint">Used to value the usufruct for tax purposes (CGI art. 669).</p>
+      </div>
+    </section>
+
+    <button type="submit" id="submit">Compute</button>
+  </form>
+
+  <p id="message" role="alert" hidden></p>
+
+  <section id="result" hidden>
+    <h2>Result</h2>
+    <div class="scroll">
+      <table id="heirs">
+        <thead>
+          <tr><th>Name</th><th>Relationship</th><th>Right</th><th class="num">Share</th>
+            <th class="num">Value</th><th class="num">Allowance</th><th class="num">Taxable</th>
+            <th class="num">Tax</th><th class="num">Net</th></tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot></tfoot>
+      </table>
+    </div>
+    <p class="hint" id="valuation-note" hidden>Usufruct and bare ownership are shown at their
+      fiscal valuation, which depends on the spouse's age.</p>
+    <h3>Why</h3>
+    <ul id="reasons"></ul>
+  </section>
+
+  <footer>Prototype for exploring rule-based legal reasoning. Not legal or tax advice.</footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
