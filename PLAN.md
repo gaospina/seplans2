@@ -50,6 +50,8 @@ taking the place of a predeceased child) and the paternal/maternal split need to
 - `alive`: yes/no (predeceased relatives are listed so their descendants can represent them)
 - `via`: the id of the relative who links this person to the deceased, when relevant
   (e.g. the grandchild's parent)
+- for a child: `commonChild` — whether the child is also the surviving spouse's child
+- for the spouse: `age`, and `option` (usufruct or quarter) when all children are common
 - later iterations: `line` (paternal/maternal), `disabled`, `renounces`
 
 The service turns this into Prolog facts (`person/2`, `parent_of/2`, `predeceased/1`,
@@ -74,11 +76,14 @@ In scope (intestate succession, "dévolution légale"):
 - Inheritance tax: allowance per relationship, progressive scale in direct line, sibling,
   up-to-4th-degree and other rates, spouse/PACS exemption, conditional sibling exemption,
   disability allowance, allowance sharing under representation (CGI art. 777, 779, 796-0)
+- Valuation of usufruct and bare ownership from the usufructuary's age (CGI art. 669),
+  needed to tax the children when the spouse takes the usufruct
 
 Out of scope for the prototype (candidates for later): wills and gifts, reserved portion
 and reduction, recall of gifts made in the previous 15 years, liquidation of the matrimonial
-regime, life insurance, valuation of usufruct (CGI art. 669), unworthiness, simple adoption,
-international successions.
+regime, life insurance, the spouse's housing rights (art. 763–764), the siblings' right of
+return on family property (art. 757-3), unworthiness, simple adoption, international
+successions.
 
 All amounts and rates go in `parameters.pl` with their source and date and must be
 checked against the current texts on Légifrance before being relied on.
@@ -89,25 +94,36 @@ Each iteration ends with a runnable application and passing tests.
 
 **0 — Scaffold (done in this commit)**: repository, this plan.
 
-**1 — Walking skeleton**: Spring Boot project with Maven Wrapper; the page (amount + rows
-of relatives); `POST /api/succession`; `PrologEngine` + `SwiplProcessEngine`; Prolog handles
-the simplest case only — living children share equally, taxed on the direct-line scale.
-Tests: `plunit` for the rules, one Spring integration test through the real bridge.
+**1 — Walking skeleton with spouse, children and parents**: Spring Boot project with Maven
+Wrapper; the page (amount + rows of relatives); `POST /api/succession`; `PrologEngine` +
+`SwiplProcessEngine`. Relations accepted: spouse, child, father, mother. Rules:
 
-**2 — Devolution without a spouse**: orders, degrees, representation, parents with siblings,
-paternal/maternal split, estate with no heirs. A table of reference cases
-(family → expected fractions) becomes the Prolog test suite.
+- Children only: equal shares (art. 735).
+- Spouse with children who are all common: the spouse's option, chosen in the form —
+  usufruct of the whole estate, or one quarter in full ownership (art. 757).
+- Spouse with at least one non-common child: one quarter in full ownership (art. 757).
+- Spouse without children, both parents alive: spouse 1/2, each parent 1/4; one parent
+  alive: spouse 3/4, parent 1/4 (art. 757-1).
+- Spouse without children or parents: the whole estate (art. 757-2).
+- Tax: spouse exempt (CGI art. 796-0 bis); children and parents on the direct-line scale
+  after their allowance. Under the usufruct option the children are taxed on the bare
+  ownership, valued from the spouse's age with the CGI art. 669 scale.
+- Any family outside these cases is answered with an explicit "not supported yet".
 
-**3 — Surviving spouse and partners**: spouse with common / non-common children, with
-parents, alone; the usufruct option as an input; PACS and cohabitants excluded.
+Tests: `plunit` for each rule above, one Spring integration test through the real bridge.
 
-**4 — Complete tax computation**: every category, allowances, exemptions, disability,
+**2 — Devolution for all other relatives**: orders, degrees, representation, parents with
+siblings, paternal/maternal split, estate with no heirs; the spouse excluding siblings and
+other collaterals; PACS partners and cohabitants listed but excluded. A table of reference
+cases (family → expected fractions) becomes the Prolog test suite.
+
+**3 — Complete tax computation**: every category, allowances, exemptions, disability,
 representation. Reference cases checked against the official simulator on impots.gouv.fr.
 
-**5 — Explanations and usability**: reasons shown per heir with the article cited; input
+**4 — Explanations and usability**: reasons shown per heir with the article cited; input
 validation and clear errors (inconsistent family, missing `via`); cleaner UI.
 
-**6 — Hardening**: timeouts and error handling on the Prolog process, GitHub Actions
+**5 — Hardening**: timeouts and error handling on the Prolog process, GitHub Actions
 (JDK + SWI-Prolog), packaging (Docker image containing both runtimes).
 
 **Later**: wills and gifts, reserved portion, JPL engine, family-tree editor.
@@ -126,7 +142,7 @@ src/test/prolog/              plunit suites and reference cases
 ## 5. Open questions
 
 1. Should the UI be in French, English, or both?
-2. When all children are common, should the spouse's option be chosen by the user, or
-   should the result show both variants side by side?
+2. When all children are common, the spouse's option is chosen by the user in the form
+   (assumed). Alternative: show both variants side by side.
 3. Is the estate amount the net estate already attributable to the deceased (after the
    matrimonial regime is settled and debts deducted)? The plan assumes yes.
