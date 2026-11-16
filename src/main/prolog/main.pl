@@ -59,7 +59,7 @@ clear_facts :-
 % --- solving -----------------------------------------------------------------
 
 % solve(-Result): Result is a dict ready to be written as JSON.
-solve(_{status: ok, heirs: Heirs, note: Note}) :-
+solve(_{status: ok, heirs: Heirs, note: Note, warnings: Warnings, usufructPercent: Percent}) :-
     validate,
     devolution(Shares),
     findall(Heir,
@@ -68,7 +68,29 @@ solve(_{status: ok, heirs: Heirs, note: Note}) :-
     (   Shares == []
     ->  Note = "Code civil art. 724 and 811: no heir among the listed relatives, the estate goes to the State."
     ;   Note = null
+    ),
+    findall(Warning, warning(Warning), Warnings),
+    (   memberchk(share(_, usufruct, _, _), Shares)
+    ->  usufruct_fraction(U),
+        Percent is U * 100
+    ;   Percent = null
     ).
+
+% warning(-Text): something in the input that is accepted but worth a second look.
+warning(Text) :-
+    person(Id, Relation),
+    memberchk(Relation, [child, descendant, sibling, sibling_descendant]),
+    predeceased(Id),
+    \+ effective(Id),
+    format(string(Text), "~w died before the deceased and no living descendant of theirs is listed: they play no part in the split.", [Id]).
+warning(Text) :-
+    living(Id, descendant),
+    living_link(Id),
+    format(string(Text), "~w is listed although the parent who links them to the deceased is alive: they do not inherit.", [Id]).
+warning(Text) :-
+    living(Id, sibling_descendant),
+    living_link(Id),
+    format(string(Text), "~w is listed although the parent who links them to the deceased is alive: they do not inherit.", [Id]).
 
 % People are named by their identifier in messages; the caller substitutes names.
 validate :-
@@ -80,7 +102,11 @@ validate :-
     ->  true
     ;   throw(invalid("List at least one relative."))
     ),
-    forall(member(Relation, [spouse, father, mother]), at_most_one_living(Relation)),
+    forall(member(Relation, [spouse, pacs_partner, father, mother]), at_most_one_living(Relation)),
+    (   living(_, spouse), living(_, pacs_partner)
+    ->  throw(invalid("The deceased cannot have left both a spouse and a PACS partner."))
+    ;   true
+    ),
     forall(person(Id, descendant), valid_link(Id, [child, descendant])),
     forall(person(Id, sibling_descendant), valid_link(Id, [sibling, sibling_descendant])),
     forall(( person(Id, Relation), needs_line(Relation) ), has_line(Id)),
@@ -135,8 +161,10 @@ invalid(Format, Arguments) :-
 heir_result(Id, Relation, Shares, Heir) :-
     memberchk(share(Id, Right, Fraction, Basis), Shares), !,
     share_value(Right, Fraction, Value),
-    tax(Id, Relation, Value, Shares, tax(Status, Allowance, Taxable, Due, TaxBasis)),
+    tax(Id, Relation, Value, Shares, tax(Status, Allowance, Taxable, Due, TaxBasis, Parts, Slices)),
     Net is Value - Due,
+    maplist(part_dict, Parts, PartDicts),
+    maplist(slice_dict, Slices, SliceDicts),
     fraction_text(Fraction, FractionText),
     cents(Value, ValueCents),
     cents(Allowance, AllowanceCents),
@@ -146,12 +174,23 @@ heir_result(Id, Relation, Shares, Heir) :-
     Heir = _{ id: Id, heir: true, right: Right, fraction: FractionText,
               valueCents: ValueCents, taxStatus: Status, allowanceCents: AllowanceCents,
               taxableCents: TaxableCents, taxCents: DueCents, netCents: NetCents,
-              basis: Basis, taxBasis: TaxBasis }.
+              basis: Basis, taxBasis: TaxBasis,
+              allowanceParts: PartDicts, brackets: SliceDicts }.
 heir_result(Id, Relation, _, Heir) :-
     exclusion_basis(Id, Relation, Basis),
     Heir = _{ id: Id, heir: false, right: null, fraction: null,
               valueCents: null, taxStatus: null, allowanceCents: null, taxableCents: null,
-              taxCents: null, netCents: null, basis: Basis, taxBasis: null }.
+              taxCents: null, netCents: null, basis: Basis, taxBasis: null,
+              allowanceParts: [], brackets: [] }.
+
+part_dict(part(Label, Amount), _{label: Label, cents: Cents}) :-
+    cents(Amount, Cents).
+
+slice_dict(slice(From, To, Rate, Amount),
+           _{fromCents: FromCents, toCents: ToCents, rate: Rate, taxCents: Cents}) :-
+    cents(From, FromCents),
+    cents(To, ToCents),
+    cents(Amount, Cents).
 
 fraction_text(F, Text) :-
     rational(F, N, D),

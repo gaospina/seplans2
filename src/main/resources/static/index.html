@@ -8,9 +8,20 @@
 </head>
 <body>
 <main>
-  <h1>French inheritance split</h1>
-  <p class="lead">Enter the net estate and the living relatives of the deceased. The rules
-    (Code civil and CGI) are evaluated by a Prolog program.</p>
+  <header>
+    <h1>French inheritance split</h1>
+    <p class="lead">Enter the net estate and the relatives of the deceased to see who inherits,
+      how much, and the inheritance tax each heir owes. The rules (Code civil and CGI) are
+      evaluated by a Prolog program.</p>
+  </header>
+
+  <div class="toolbar">
+    <label for="example">Try an example</label>
+    <select id="example">
+      <option value="">Choose…</option>
+    </select>
+    <button type="button" id="reset">Start over</button>
+  </div>
 
   <form id="form" novalidate>
     <section>
@@ -37,13 +48,13 @@
 
     <section id="spouse-section" hidden>
       <h2>Surviving spouse</h2>
-      <div id="option-block">
-        <p>All children are common to the couple, so the spouse chooses:</p>
+      <fieldset id="option-block">
+        <legend>All children are common to the couple, so the spouse chooses:</legend>
         <label class="choice"><input type="radio" name="option" value="USUFRUCT">
           Usufruct of the whole estate</label>
         <label class="choice"><input type="radio" name="option" value="QUARTER">
           One quarter in full ownership</label>
-      </div>
+      </fieldset>
       <div id="age-block">
         <label for="spouse-age">Spouse's age</label>
         <input id="spouse-age" type="number" min="0" max="130" step="1">
@@ -51,13 +62,23 @@
       </div>
     </section>
 
+    <div id="message" role="alert" hidden></div>
+
     <button type="submit" id="submit">Compute</button>
   </form>
 
-  <p id="message" role="alert" hidden></p>
-
   <section id="result" hidden>
     <h2>Result</h2>
+
+    <dl id="summary">
+      <div><dt>Estate</dt><dd id="sum-estate"></dd></div>
+      <div><dt>Total tax</dt><dd id="sum-tax"></dd></div>
+      <div><dt>Net to the heirs</dt><dd id="sum-net"></dd></div>
+    </dl>
+
+    <p id="note" class="notice" hidden></p>
+    <ul id="warnings" class="notice" hidden></ul>
+
     <div class="scroll">
       <table id="heirs">
         <thead>
@@ -66,13 +87,12 @@
             <th class="num">Tax</th><th class="num">Net</th></tr>
         </thead>
         <tbody></tbody>
-        <tfoot></tfoot>
       </table>
     </div>
-    <p class="hint" id="valuation-note" hidden>Usufruct and bare ownership are shown at their
-      fiscal valuation, which depends on the spouse's age.</p>
-    <h3>Why</h3>
-    <ul id="reasons"></ul>
+    <p class="hint" id="valuation-note" hidden></p>
+
+    <h3>How each amount is computed</h3>
+    <div id="explanations"></div>
   </section>
 
   <footer>Prototype for exploring rule-based legal reasoning. Not legal or tax advice.</footer>

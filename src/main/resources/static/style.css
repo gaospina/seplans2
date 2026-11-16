@@ -4,6 +4,7 @@
   --line: #d5dbe3;
   --surface: #f5f7fa;
   --accent: #1f5fae;
+  --error: #b42318;
   --error-bg: #fdecec;
   --error-text: #8a1f1f;
   --info-bg: #fff6dd;
@@ -20,13 +21,18 @@ body {
   background: #fff;
 }
 
-main { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
 
 h1 { font-size: 1.7rem; margin: 0 0 4px; }
 h2 { font-size: 1.15rem; margin: 0 0 8px; }
-h3 { font-size: 1rem; margin: 20px 0 6px; }
-.lead { color: var(--muted); margin: 0 0 24px; }
-.hint { color: var(--muted); font-size: 0.875rem; margin: 4px 0 0; }
+h3 { font-size: 1rem; margin: 24px 0 8px; }
+.lead { color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
+.hint { color: var(--muted); font-size: 0.875rem; margin: 4px 0 0; max-width: 80ch; }
+
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.toolbar label { margin: 0; font-weight: 400; color: var(--muted); }
+.toolbar select { flex: 1 1 220px; min-width: 0; max-width: 520px; }
+.toolbar #reset { margin-left: auto; }
 
 form > section, #result {
   border: 1px solid var(--line);
@@ -37,6 +43,8 @@ form > section, #result {
 
 label { display: block; font-weight: 600; margin-bottom: 4px; }
 label.choice { font-weight: 400; margin: 4px 0; }
+fieldset { border: 0; padding: 0; margin: 0; }
+legend { padding: 0; margin-bottom: 4px; }
 
 input[type="number"], input[type="text"], select {
   font: inherit;
@@ -47,6 +55,10 @@ input[type="number"], input[type="text"], select {
   color: var(--text);
   max-width: 100%;
 }
+[aria-invalid="true"] { border-color: var(--error) !important; outline: 1px solid var(--error); }
+fieldset[aria-invalid="true"] { outline-offset: 6px; border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 #estate { width: 220px; }
 #spouse-age { width: 100px; }
 #age-block { margin-top: 12px; }
@@ -60,7 +72,10 @@ button {
   color: var(--text);
   cursor: pointer;
 }
-button[type="submit"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button[type="submit"] {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  font-weight: 600; padding: 9px 22px;
+}
 button.remove { padding: 4px 10px; }
 button:disabled { opacity: 0.6; cursor: default; }
 
@@ -68,19 +83,33 @@ table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
 .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-tfoot td { font-weight: 600; border-bottom: none; }
 tr.not-heir td { color: var(--muted); }
+.scroll { overflow-x: auto; }
+
 #persons input[type="text"] { width: 100%; min-width: 120px; }
 #persons td.details label { display: inline-block; font-weight: 400; margin: 2px 14px 2px 0; white-space: nowrap; }
 #persons td.details select { margin-left: 4px; }
 #persons td.details .none { color: var(--muted); }
-.scroll { overflow-x: auto; }
 
-#message { padding: 10px 14px; border-radius: 8px; margin: 0 0 16px; }
-#message.error { background: var(--error-bg); color: var(--error-text); }
-#message.info { background: var(--info-bg); color: var(--info-text); }
+#message { padding: 10px 14px; border-radius: 8px; margin: 0 0 16px; background: var(--error-bg); color: var(--error-text); }
+#message ul { margin: 4px 0 0; padding-left: 20px; }
+.notice { background: var(--info-bg); color: var(--info-text); border-radius: 8px; padding: 10px 14px; margin: 0 0 12px; }
+ul.notice { padding-left: 34px; }
 
-#reasons { margin: 0; padding-left: 20px; }
-#reasons li { margin-bottom: 6px; }
+#summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 8px 0 16px; }
+#summary div { background: var(--surface); border-radius: 8px; padding: 10px 14px; }
+#summary dt { color: var(--muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+#summary dd { margin: 0; font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+#explanations details { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
+#explanations summary { cursor: pointer; padding: 8px 12px; font-weight: 600; }
+#explanations summary span { font-weight: 400; color: var(--muted); }
+#explanations .body { padding: 0 12px 12px; }
+#explanations p { margin: 0 0 8px; max-width: 85ch; }
+#explanations table { width: auto; min-width: min(100%, 460px); margin: 4px 0 0; }
+#explanations td { border-bottom: none; padding: 2px 8px 2px 0; }
+#explanations td.num { padding-left: 24px; padding-right: 0; }
+#explanations tr.total td { border-top: 1px solid var(--line); font-weight: 600; }
+#explanations tr.sub td:first-child { padding-left: 16px; color: var(--muted); }
 
 footer { color: var(--muted); font-size: 0.875rem; margin-top: 24px; }

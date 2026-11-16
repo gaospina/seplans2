@@ -490,3 +490,55 @@ test(disabled_cousin) :-
     heir(R, c, C), C.taxCents =:= 2149455.
 
 :- end_tests(disability).
+
+:- begin_tests(explanations).
+
+test(tax_is_detailed_bracket_by_bracket) :-
+    % The four brackets of the official example: 403.60, 403.70, 573.45, 6 813.60
+    with_facts([ estate_cents(15000000), person(a, child) ], R),
+    heir(R, a, A),
+    findall(T, ( member(B, A.brackets), T = B.taxCents ), [40360, 40370, 57345, 681360]),
+    A.brackets = [First|_],
+    First.fromCents =:= 0, First.toCents =:= 807200, First.rate =:= 5.
+
+test(allowance_parts_listed) :-
+    with_facts([ estate_cents(30000000), person(a, child), disabled(a) ], R),
+    heir(R, a, A),
+    findall(C, ( member(P, A.allowanceParts), C = P.cents ), [10000000, 15932500]).
+
+test(shared_allowance_part_says_so) :-
+    with_facts([ estate_cents(60000000), person(b, child), predeceased(b),
+                 person(g1, descendant), via(g1, b),
+                 person(g2, descendant), via(g2, b) ], R),
+    heir(R, g1, G), G.allowanceParts = [Part],
+    Part.cents =:= 5000000,
+    once(sub_string(Part.label, _, _, _, "1/2")).
+
+test(exempt_heir_has_no_detail) :-
+    with_facts([ estate_cents(30000000), person(s, spouse) ], R),
+    heir(R, s, S), S.brackets == [], S.allowanceParts == [].
+
+test(usufruct_percent_reported) :-
+    with_facts([ estate_cents(60000000), person(s, spouse), person(a, child),
+                 common_child(a), spouse_option(usufruct), spouse_age(65) ], R),
+    R.usufructPercent =:= 40.
+
+test(no_usufruct_percent_otherwise) :-
+    with_facts([ estate_cents(60000000), person(a, child) ], R),
+    R.usufructPercent == null, R.warnings == [].
+
+test(warns_about_predeceased_without_descendants) :-
+    with_facts([ estate_cents(60000000), person(a, child),
+                 person(b, child), predeceased(b) ], R),
+    R.warnings = [W], sub_string(W, 0, _, _, "b ").
+
+test(warns_about_descendant_of_living_parent) :-
+    with_facts([ estate_cents(60000000), person(a, child),
+                 person(g, descendant), via(g, a) ], R),
+    R.warnings = [W], sub_string(W, 0, _, _, "g ").
+
+test(spouse_and_pacs_partner_rejected) :-
+    with_facts([ estate_cents(60000000), person(s, spouse), person(p, pacs_partner) ], R),
+    R.status == invalid.
+
+:- end_tests(explanations).

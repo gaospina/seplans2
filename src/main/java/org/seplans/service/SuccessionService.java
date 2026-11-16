@@ -42,7 +42,9 @@ public class SuccessionService {
 		List<PersonInput> persons = request.persons();
 		EngineResult result = parse(engine.solve(facts(request)));
 		return switch (result.status()) {
-			case "ok" -> new SuccessionResponse("ok", result.note(), heirs(persons, result.heirs()));
+			case "ok" -> new SuccessionResponse("ok", result.note(), heirs(persons, result.heirs()),
+					orEmpty(result.warnings()).stream().map(warning -> withNames(warning, persons)).toList(),
+					result.usufructPercent());
 			case "unsupported" -> SuccessionResponse.failure("unsupported", result.message());
 			case "invalid" -> throw new InvalidRequestException(withNames(result.message(), persons));
 			default -> throw new PrologEngineException("The rule base reported an error: " + result.message());
@@ -163,9 +165,17 @@ public class SuccessionService {
 			heirs.add(new HeirResult(name(persons, i), persons.get(i).relation(), heir.heir(), heir.right(),
 					heir.fraction(), euros(heir.valueCents()), heir.taxStatus(), euros(heir.allowanceCents()),
 					euros(heir.taxableCents()), euros(heir.taxCents()), euros(heir.netCents()), heir.basis(),
-					heir.taxBasis()));
+					heir.taxBasis(),
+					orEmpty(heir.allowanceParts()).stream()
+							.map(part -> new HeirResult.AllowancePart(part.label(), euros(part.cents()))).toList(),
+					orEmpty(heir.brackets()).stream().map(slice -> new HeirResult.Bracket(euros(slice.fromCents()),
+							euros(slice.toCents()), slice.rate(), euros(slice.taxCents()))).toList()));
 		}
 		return heirs;
+	}
+
+	private static <T> List<T> orEmpty(List<T> list) {
+		return list == null ? List.of() : list;
 	}
 
 	private static BigDecimal euros(Long cents) {
@@ -173,10 +183,18 @@ public class SuccessionService {
 	}
 
 	/** The JSON object written by main.pl. */
-	record EngineResult(String status, String message, String note, List<EngineHeir> heirs) {
+	record EngineResult(String status, String message, String note, List<EngineHeir> heirs, List<String> warnings,
+			Integer usufructPercent) {
 	}
 
 	record EngineHeir(String id, boolean heir, String right, String fraction, Long valueCents, String taxStatus,
-			Long allowanceCents, Long taxableCents, Long taxCents, Long netCents, String basis, String taxBasis) {
+			Long allowanceCents, Long taxableCents, Long taxCents, Long netCents, String basis, String taxBasis,
+			List<EnginePart> allowanceParts, List<EngineSlice> brackets) {
+	}
+
+	record EnginePart(String label, Long cents) {
+	}
+
+	record EngineSlice(Long fromCents, Long toCents, int rate, Long taxCents) {
 	}
 }

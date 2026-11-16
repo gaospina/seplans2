@@ -36,26 +36,48 @@ usufruct_fraction(U) :-
     U is Percent rdiv 100.
 
 % tax(+Id, +Relation, +Value, +Shares, -Tax)
-% Tax is tax(Status, Allowance, Taxable, Due, Basis). Status is exempt or
-% computed; Allowance and Taxable are null for an exempt heir.
-tax(_, spouse, _, _, tax(exempt, null, null, 0, Basis)) :- !,
+% Tax is tax(Status, Allowance, Taxable, Due, Basis, Parts, Slices). Status is
+% exempt or computed; Allowance and Taxable are null for an exempt heir.
+% Parts lists the allowances the heir is entitled to as part(Label, Cents);
+% the allowance applied is their sum, capped at the value of the share.
+% Slices lists the tax bracket by bracket as slice(FromCents, ToCents, RatePercent, Cents).
+tax(_, spouse, _, _, tax(exempt, null, null, 0, Basis, [], [])) :- !,
     Basis = "CGI art. 796-0 bis: the surviving spouse is exempt from inheritance tax.".
-tax(Id, sibling, _, _, tax(exempt, null, null, 0, Basis)) :-
+tax(Id, sibling, _, _, tax(exempt, null, null, 0, Basis, [], [])) :-
     exempt_sibling(Id), !,
     Basis = "CGI art. 796-0 ter: a brother or sister who is single, over 50 or infirm, and lived with the deceased for five years is exempt.".
-tax(Id, Relation, Value, Shares, tax(computed, Allowance, Taxable, Due, Basis)) :-
+tax(Id, Relation, Value, Shares, tax(computed, Allowance, Taxable, Due, Basis, Parts, Slices)) :-
     regime(Id, Relation, Shares, AllowanceCategory, Weight, ScaleCategory, RegimeBasis),
     allowance(AllowanceCategory, Euros),
+    Base is Euros * Weight * 100,
+    allowance_label(AllowanceCategory, Weight, Label),
     (   disabled(Id)
-    ->  allowance(disability, Extra),
+    ->  allowance(disability, ExtraEuros),
+        Extra is ExtraEuros * 100,
+        Parts = [part(Label, Base), part("Disability allowance", Extra)],
         format(string(Basis), "~w CGI art. 779 II: the disability allowance is added.", [RegimeBasis])
     ;   Extra = 0,
+        Parts = [part(Label, Base)],
         Basis = RegimeBasis
     ),
-    Allowance is min((Euros * Weight + Extra) * 100, Value),
+    Allowance is min(Base + Extra, Value),
     Taxable is Value - Allowance,
     scale(ScaleCategory, Scale),
-    scale_tax(Scale, 0, Taxable, 0, Due).
+    slices(Scale, 0, Taxable, Slices),
+    sum_slices(Slices, 0, Due).
+
+allowance_label(Category, Weight, Label) :-
+    allowance_name(Category, Name),
+    (   Weight =:= 1
+    ->  Label = Name
+    ;   rational(Weight, N, D),
+        format(string(Label), "~w, ~w/~w of it by representation", [Name, N, D])
+    ).
+
+allowance_name(direct_line,  "Direct-line allowance").
+allowance_name(sibling,      "Brother and sister allowance").
+allowance_name(nephew_niece, "Nephew and niece allowance").
+allowance_name(default,      "Default allowance").
 
 % regime(+Id, +Relation, +Shares, -AllowanceCategory, -Weight, -ScaleCategory, -Basis)
 % Weight is the part of the allowance the heir is entitled to: representatives
@@ -126,15 +148,26 @@ stem_root(Id, Root) :-
     ;   Root = Id
     ).
 
-% scale_tax(+Brackets, +LowerCents, +TaxableCents, +Acc, -Due)
-scale_tax([], _, _, Due, Due).
-scale_tax([Upper-Rate|Brackets], Lower, Taxable, Acc0, Due) :-
+% slices(+Brackets, +LowerCents, +TaxableCents, -Slices)
+% One slice(FromCents, ToCents, RatePercent, TaxCents) per bracket reached.
+slices([], _, _, []).
+slices([Upper-Rate|Brackets], Lower, Taxable, Slices) :-
     (   Taxable =< Lower
-    ->  Due = Acc0
-    ;   Upper == inf
-    ->  Due is Acc0 + (Taxable - Lower) * Rate rdiv 100
-    ;   UpperCents is Upper * 100,
-        Top is min(Taxable, UpperCents),
-        Acc is Acc0 + (Top - Lower) * Rate rdiv 100,
-        scale_tax(Brackets, UpperCents, Taxable, Acc, Due)
+    ->  Slices = []
+    ;   (   Upper == inf
+        ->  Top = Taxable
+        ;   Top is min(Taxable, Upper * 100)
+        ),
+        Amount is (Top - Lower) * Rate rdiv 100,
+        Slices = [slice(Lower, Top, Rate, Amount)|Rest],
+        (   Upper == inf
+        ->  Rest = []
+        ;   UpperCents is Upper * 100,
+            slices(Brackets, UpperCents, Taxable, Rest)
+        )
     ).
+
+sum_slices([], Due, Due).
+sum_slices([slice(_, _, _, Amount)|Slices], Acc0, Due) :-
+    Acc is Acc0 + Amount,
+    sum_slices(Slices, Acc, Due).

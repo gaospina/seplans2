@@ -8,7 +8,11 @@ See [PLAN.md](PLAN.md) for the architecture, legal scope and iteration plan.
 
 This is a prototype for exploring rule-based legal reasoning. It is not legal or tax advice.
 
-## What works today (iterations 1 to 3)
+## What works today (iterations 1 to 4)
+
+The page lists the relatives, checks the input, and shows for each person the share, the
+tax and how every amount was reached: the rule and article applied, the allowances, and
+the tax bracket by bracket. "Try an example" loads ready-made families.
 
 Intestate devolution for the whole family, in the order set by the Code civil:
 
@@ -121,6 +125,7 @@ list, from 0, of the parent of a `DESCENDANT` or `SIBLING_DESCENDANT`), `line` (
 or `MATERNAL`, for grandparents and other collaterals), `commonChild`, `disabled` and, for
 a sibling, `siblingExemption`.
 
-The response has a `status` (`ok`, `invalid`, `error`), a `message`, and one entry per
-person in `heirs` with the right, fraction, value, `taxStatus` (`exempt` or `computed`),
-allowance, taxable amount, tax, net amount and the legal basis.
+The response has a `status` (`ok`, `invalid`, `error`), a `message`, a list of `warnings`,
+`usufructPercent` when the spouse takes the usufruct, and one entry per person in `heirs`
+with the right, fraction, value, `taxStatus` (`exempt` or `computed`), `allowanceParts`,
+`brackets`, allowance, taxable amount, tax, net amount and the legal basis.

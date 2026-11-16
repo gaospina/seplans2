@@ -105,6 +105,26 @@ class SuccessionApiTest {
 		assertEquals("1/4", heirs.get(2).get("fraction").asString());
 		assertEquals(0, heirs.get(2).get("allowance").decimalValue().compareTo(new java.math.BigDecimal("50000")));
 		assertEquals(0, heirs.get(3).get("tax").decimalValue().compareTo(new java.math.BigDecimal("18194.35")));
+
+		// The computation is detailed: shared allowance, then four brackets.
+		JsonNode zoe = heirs.get(2);
+		assertTrue(zoe.get("allowanceParts").get(0).get("label").asString().contains("1/2"));
+		assertEquals(4, zoe.get("brackets").size());
+		assertEquals(5, zoe.get("brackets").get(0).get("rate").asInt());
+		assertEquals(0, zoe.get("brackets").get(0).get("tax").decimalValue().compareTo(new java.math.BigDecimal("403.60")));
+	}
+
+	@Test
+	void warningsUseTheNamesTyped() throws Exception {
+		HttpResponse<String> response = post("""
+				{"estate": 600000, "persons": [
+				  {"name": "Luc", "relation": "CHILD"},
+				  {"name": "Anne", "relation": "CHILD", "alive": false}]}
+				""");
+		assertEquals(200, response.statusCode(), response.body());
+		JsonNode warnings = json.readTree(response.body()).get("warnings");
+		assertEquals(1, warnings.size());
+		assertTrue(warnings.get(0).asString().startsWith("Anne "), response.body());
 	}
 
 	@Test

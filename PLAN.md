@@ -4,8 +4,8 @@ Prototype web application that computes how a French estate is split between hei
 and the inheritance tax each heir owes. The legal reasoning lives in Prolog; Spring Boot
 provides the web layer and a bridge to the Prolog engine.
 
-Status: iterations 1 to 3 are implemented (see README.md for what works). Iterations 4 and 5
-are not started.
+Status: iterations 1 to 4 are implemented (see README.md for what works). Iteration 5 is
+not started.
 
 ## 1. Architecture
 
@@ -135,8 +135,11 @@ One rule rests on doctrine rather than on that page and should be confirmed: nep
 nieces are taxed as the brother or sister they represent only when there are several stems;
 descending from the deceased's only sibling, they are taxed at 55 % with their own allowance.
 
-**4 — Explanations and usability**: reasons shown per heir with the article cited; input
-validation and clear errors (inconsistent family, missing `via`); cleaner UI.
+**4 — Explanations and usability**: reasons shown per heir with the article cited, and the
+computation laid out line by line (share, allowances, taxable amount, tax bracket by
+bracket), all produced by the rule base; warnings for input that is accepted but has no
+effect; problems the page can see are flagged on the field before anything is sent, the
+rest come back from the rules with the names typed; ready-made example families.
 
 **5 — Hardening**: timeouts and error handling on the Prolog process, GitHub Actions
 (JDK + SWI-Prolog), packaging (Docker image containing both runtimes).
