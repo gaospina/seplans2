@@ -8,22 +8,32 @@ See [PLAN.md](PLAN.md) for the architecture, legal scope and iteration plan.
 
 This is a prototype for exploring rule-based legal reasoning. It is not legal or tax advice.
 
-## What works today (iteration 1)
+## What works today (iterations 1 and 2)
 
-Living relatives of type spouse, child, father and mother:
+Intestate devolution for the whole family, in the order set by the Code civil:
 
 | Family | Result |
 |---|---|
-| Children only | Equal shares |
-| Spouse + children, all common | Spouse chooses: usufruct of everything, or 1/4 in full ownership |
-| Spouse + at least one non-common child | Spouse 1/4, children share 3/4 |
-| Spouse + both parents, no children | Spouse 1/2, each parent 1/4 |
-| Spouse + one parent, no children | Spouse 3/4, parent 1/4 |
-| Spouse alone | Everything |
+| Descendants, no spouse | Children share equally; descendants of a predeceased child take that child's share (representation, at any depth) |
+| Spouse + descendants, all children common | Spouse chooses: usufruct of everything, or 1/4 in full ownership |
+| Spouse + descendants, at least one non-common child | Spouse 1/4, descendants share 3/4 |
+| Spouse, no descendants, both parents | Spouse 1/2, each parent 1/4 |
+| Spouse, no descendants, one parent | Spouse 3/4, parent 1/4 |
+| Spouse, no descendants, no parents | Spouse takes everything; siblings and other relatives are excluded |
+| Parents and siblings | Each parent 1/4, siblings (or their descendants, by representation) share the rest |
+| Siblings only | Siblings, or their descendants by representation, share everything |
+| Parents only | 1/2 each; a sole parent shares half with the ascendants of the other line, or takes everything if there are none |
+| Grandparents, great-grandparents | Half to each of the paternal and maternal lines, closest degree in each line; one line alone takes everything |
+| Uncles, aunts, cousins… up to the 6th degree | Same split between lines, closest degree in each line |
+| Nobody | The estate goes to the State |
 
-The spouse is exempt from tax; children and parents are taxed on the direct-line scale after
-the 100 000 € allowance. Under the usufruct option, shares are valued with the CGI art. 669
-scale from the spouse's age. Any other family is answered with "not supported yet".
+PACS partners and cohabitants can be listed and are reported as not inheriting.
+
+Tax: the spouse is exempt; children, their representatives, parents and other ascendants
+are taxed on the direct-line scale after the 100 000 € allowance (representatives share the
+allowance of the child they represent). Under the usufruct option, shares are valued with
+the CGI art. 669 scale from the spouse's age. Tax between brothers, sisters and other
+collaterals is **not computed yet** and is reported as such.
 
 ## Requirements
 
@@ -63,6 +73,11 @@ estate_cents(60000000).
 person(p0, spouse).
 person(p1, child).
 common_child(p1).
+person(p2, child).
+predeceased(p2).
+common_child(p2).
+person(p3, descendant).
+via(p3, p2).
 spouse_option(usufruct).
 spouse_age(65).
 ```
@@ -82,11 +97,17 @@ identified by generated ids.
   "spouseOption": "USUFRUCT",
   "persons": [
     { "name": "Claire", "relation": "SPOUSE" },
-    { "name": "Luc", "relation": "CHILD", "commonChild": true }
+    { "name": "Luc", "relation": "CHILD", "commonChild": true },
+    { "name": "Anne", "relation": "CHILD", "commonChild": true, "alive": false },
+    { "name": "Zoe", "relation": "DESCENDANT", "via": 2 }
   ]
 }
 ```
 
-The response has a `status` (`ok`, `unsupported`, `invalid`, `error`), a `message` when the
-status is not `ok`, and one entry per person in `heirs` with the right, fraction, value,
-allowance, taxable amount, tax, net amount and the legal basis.
+Per person: `relation` (see `Relation.java`), `alive` (default true), `via` (position in the
+list, from 0, of the parent of a `DESCENDANT` or `SIBLING_DESCENDANT`), `line` (`PATERNAL`
+or `MATERNAL`, for grandparents and other collaterals) and `commonChild`.
+
+The response has a `status` (`ok`, `invalid`, `error`), a `message`, and one entry per
+person in `heirs` with the right, fraction, value, `taxStatus` (`exempt`, `computed` or
+`pending`), allowance, taxable amount, tax, net amount and the legal basis.

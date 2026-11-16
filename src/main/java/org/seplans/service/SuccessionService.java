@@ -3,6 +3,8 @@ package org.seplans.service;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.seplans.api.HeirResult;
 import org.seplans.api.PersonInput;
@@ -24,7 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
 public class SuccessionService {
 
 	private static final BigDecimal MAX_ESTATE = new BigDecimal("1000000000000");
-	private static final int MAX_PERSONS = 50;
+	private static final int MAX_PERSONS = 100;
+	private static final Pattern PERSON_ID = Pattern.compile("\\bp(\\d+)\\b");
 
 	private final PrologEngine engine;
 	private final JsonMapper json;
@@ -36,11 +39,12 @@ public class SuccessionService {
 
 	public SuccessionResponse solve(SuccessionRequest request) {
 		validate(request);
+		List<PersonInput> persons = request.persons();
 		EngineResult result = parse(engine.solve(facts(request)));
 		return switch (result.status()) {
-			case "ok" -> new SuccessionResponse("ok", null, heirs(request.persons(), result.heirs()));
+			case "ok" -> new SuccessionResponse("ok", result.note(), heirs(persons, result.heirs()));
 			case "unsupported" -> SuccessionResponse.failure("unsupported", result.message());
-			case "invalid" -> throw new InvalidRequestException(result.message());
+			case "invalid" -> throw new InvalidRequestException(withNames(result.message(), persons));
 			default -> throw new PrologEngineException("The rule base reported an error: " + result.message());
 		};
 	}
@@ -60,8 +64,15 @@ public class SuccessionService {
 		if (persons.size() > MAX_PERSONS) {
 			throw new InvalidRequestException("At most " + MAX_PERSONS + " relatives can be listed.");
 		}
-		if (persons.stream().anyMatch(p -> p == null || p.relation() == null)) {
-			throw new InvalidRequestException("Every relative needs a relationship.");
+		for (int i = 0; i < persons.size(); i++) {
+			PersonInput person = persons.get(i);
+			if (person == null || person.relation() == null) {
+				throw new InvalidRequestException("Every relative needs a relationship.");
+			}
+			Integer via = person.via();
+			if (person.relation().linkedByParent() && via != null && (via < 0 || via >= persons.size())) {
+				throw new InvalidRequestException(name(persons, i) + ": the parent is not in the list.");
+			}
 		}
 		Integer age = request.spouseAge();
 		if (age != null && (age < 0 || age > 130)) {
@@ -79,9 +90,19 @@ public class SuccessionService {
 		List<PersonInput> persons = request.persons();
 		for (int i = 0; i < persons.size(); i++) {
 			PersonInput person = persons.get(i);
-			facts.append("person(").append(id(i)).append(", ").append(person.relation().atom()).append(").\n");
+			String id = id(i);
+			facts.append("person(").append(id).append(", ").append(person.relation().atom()).append(").\n");
+			if (person.isPredeceased()) {
+				facts.append("predeceased(").append(id).append(").\n");
+			}
+			if (person.relation().linkedByParent() && person.via() != null) {
+				facts.append("via(").append(id).append(", ").append(id(person.via())).append(").\n");
+			}
+			if (person.relation().needsLine() && person.line() != null) {
+				facts.append("line(").append(id).append(", ").append(person.line().atom()).append(").\n");
+			}
 			if (person.isCommonChild()) {
-				facts.append("common_child(").append(id(i)).append(").\n");
+				facts.append("common_child(").append(id).append(").\n");
 			}
 		}
 		if (request.spouseAge() != null) {
@@ -95,6 +116,23 @@ public class SuccessionService {
 
 	private static String id(int index) {
 		return "p" + index;
+	}
+
+	private static String name(List<PersonInput> persons, int index) {
+		String name = persons.get(index).name();
+		return name == null || name.isBlank() ? "Person " + (index + 1) : name.strip();
+	}
+
+	/** The rule base names people by identifier; show the names the user typed instead. */
+	private static String withNames(String message, List<PersonInput> persons) {
+		if (message == null) {
+			return null;
+		}
+		Matcher matcher = PERSON_ID.matcher(message);
+		return matcher.replaceAll(match -> {
+			int index = Integer.parseInt(match.group(1));
+			return Matcher.quoteReplacement(index < persons.size() ? name(persons, index) : match.group());
+		});
 	}
 
 	private EngineResult parse(String output) {
@@ -116,11 +154,10 @@ public class SuccessionService {
 			String id = id(i);
 			EngineHeir heir = engineHeirs.stream().filter(h -> id.equals(h.id())).findFirst()
 					.orElseThrow(() -> new PrologEngineException("The rule base gave no answer for " + id + "."));
-			PersonInput person = persons.get(i);
-			String name = person.name() == null || person.name().isBlank() ? "Person " + (i + 1) : person.name().strip();
-			heirs.add(new HeirResult(name, person.relation(), heir.heir(), heir.right(), heir.fraction(),
-					euros(heir.valueCents()), euros(heir.allowanceCents()), euros(heir.taxableCents()),
-					euros(heir.taxCents()), euros(heir.netCents()), heir.basis(), heir.taxBasis()));
+			heirs.add(new HeirResult(name(persons, i), persons.get(i).relation(), heir.heir(), heir.right(),
+					heir.fraction(), euros(heir.valueCents()), heir.taxStatus(), euros(heir.allowanceCents()),
+					euros(heir.taxableCents()), euros(heir.taxCents()), euros(heir.netCents()), heir.basis(),
+					heir.taxBasis()));
 		}
 		return heirs;
 	}
@@ -130,10 +167,10 @@ public class SuccessionService {
 	}
 
 	/** The JSON object written by main.pl. */
-	record EngineResult(String status, String message, List<EngineHeir> heirs) {
+	record EngineResult(String status, String message, String note, List<EngineHeir> heirs) {
 	}
 
-	record EngineHeir(String id, boolean heir, String right, String fraction, Long valueCents, Long allowanceCents,
-			Long taxableCents, Long taxCents, Long netCents, String basis, String taxBasis) {
+	record EngineHeir(String id, boolean heir, String right, String fraction, Long valueCents, String taxStatus,
+			Long allowanceCents, Long taxableCents, Long taxCents, Long netCents, String basis, String taxBasis) {
 	}
 }

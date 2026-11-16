@@ -21,15 +21,17 @@
 
     <section>
       <h2>Relatives</h2>
-      <p class="hint">List living relatives only. This version handles the spouse, children,
-        father and mother. A child who died before the deceased and left descendants is not
-        handled yet.</p>
-      <table id="persons">
-        <thead>
-          <tr><th>Name</th><th>Relationship</th><th>Also the spouse's child</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <p class="hint">List the living relatives. Also list a child, brother or sister who died
+        before the deceased if they left descendants, then add those descendants and say whose
+        child each one is: they inherit in the place of their parent.</p>
+      <div class="scroll">
+        <table id="persons">
+          <thead>
+            <tr><th>Name</th><th>Relationship</th><th>Details</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <button type="button" id="add">Add a relative</button>
     </section>
 
@@ -69,6 +71,8 @@
     </div>
     <p class="hint" id="valuation-note" hidden>Usufruct and bare ownership are shown at their
       fiscal valuation, which depends on the spouse's age.</p>
+    <p class="hint" id="pending-note" hidden>Inheritance tax between brothers, sisters and
+      other collaterals is not computed yet; the total covers the other heirs only.</p>
     <h3>Why</h3>
     <ul id="reasons"></ul>
   </section>

@@ -11,6 +11,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -70,6 +71,9 @@ th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; color
 tfoot td { font-weight: 600; border-bottom: none; }
 tr.not-heir td { color: var(--muted); }
 #persons input[type="text"] { width: 100%; min-width: 120px; }
+#persons td.details label { display: inline-block; font-weight: 400; margin: 2px 14px 2px 0; white-space: nowrap; }
+#persons td.details select { margin-left: 4px; }
+#persons td.details .none { color: var(--muted); }
 .scroll { overflow-x: auto; }
 
 #message { padding: 10px 14px; border-radius: 8px; margin: 0 0 16px; }

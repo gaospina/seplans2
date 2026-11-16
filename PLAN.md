@@ -4,7 +4,8 @@ Prototype web application that computes how a French estate is split between hei
 and the inheritance tax each heir owes. The legal reasoning lives in Prolog; Spring Boot
 provides the web layer and a bridge to the Prolog engine.
 
-Status: iteration 1 is implemented (see README.md for what works). Iterations 2–5 are not started.
+Status: iterations 1 and 2 are implemented (see README.md for what works). Iterations 3–5
+are not started.
 
 ## 1. Architecture
 
@@ -45,20 +46,23 @@ taking the place of a predeceased child) and the paternal/maternal split need to
 *through whom* someone is related. Each person is therefore encoded as:
 
 - `id`, `name`
-- `relation`: spouse, PACS partner, child, grandchild, father, mother, sibling,
-  nephew/niece, grandparent, uncle/aunt, cousin, other
-- `alive`: yes/no (predeceased relatives are listed so their descendants can represent them);
-  arrives with representation in iteration 2 — iteration 1 lists living relatives only
-- `via`: the id of the relative who links this person to the deceased, when relevant
-  (e.g. the grandchild's parent)
+- `relation`: spouse, PACS partner, cohabitant, child, descendant (grandchild or further),
+  father, mother, sibling, sibling's descendant (nephew, niece or further), grandparent,
+  great-grandparent, uncle/aunt, great-uncle/great-aunt, first cousin, other collateral of
+  the 5th or 6th degree
+- `alive`: yes/no (predeceased children and siblings are listed so their descendants can
+  represent them)
+- `via`: for a descendant or a sibling's descendant, the listed parent who links this
+  person to the deceased
+- `line`: paternal or maternal, for ordinary ascendants and collaterals
 - for a child: `commonChild` — whether the child is also the surviving spouse's child
 - for the succession: `spouseAge`, and `spouseOption` (usufruct or quarter) when all
   children are common
-- later iterations: `line` (paternal/maternal), `disabled`, `renounces`
+- later iterations: `disabled`, `renounces`
 
-The service turns this into Prolog facts (iteration 1: `estate_cents/1`, `person/2`,
-`common_child/1`, `spouse_age/1`, `spouse_option/1`; later `parent_of/2`, `predeceased/1`),
-and the rules derive everything else.
+The service turns this into Prolog facts (`estate_cents/1`, `person/2`, `predeceased/1`,
+`via/2`, `line/2`, `common_child/1`, `spouse_age/1`, `spouse_option/1`), and the rules
+derive everything else.
 
 ### Output model
 
@@ -118,7 +122,9 @@ Tests: `plunit` for each rule above, one Spring integration test through the rea
 **2 — Devolution for all other relatives**: orders, degrees, representation, parents with
 siblings, paternal/maternal split, estate with no heirs; the spouse excluding siblings and
 other collaterals; PACS partners and cohabitants listed but excluded. A table of reference
-cases (family → expected fractions) becomes the Prolog test suite.
+cases (family → expected fractions) becomes the Prolog test suite. Tax is computed for every
+direct-line heir (representatives share the allowance of the child they represent); for
+brothers, sisters and other collaterals it is reported as "not computed yet" until iteration 3.
 
 **3 — Complete tax computation**: every category, allowances, exemptions, disability,
 representation. Reference cases checked against the official simulator on impots.gouv.fr.

@@ -2,11 +2,10 @@
 % Every figure is in euros or percent and names its legal source.
 % Figures as in force for deaths in 2026; check Legifrance before relying on them.
 
-% allowance(+Relation, -Euros)
-% CGI art. 779 I: allowance in direct line (children, father, mother).
-allowance(child,  100000).
-allowance(father, 100000).
-allowance(mother, 100000).
+% allowance(+Category, -Euros)
+% CGI art. 779 I: allowance in direct line (children and their representatives,
+% father, mother and other ascendants).
+allowance(direct_line, 100000).
 
 % direct_line_scale(-Brackets)
 % CGI art. 777, table I. Each bracket is UpperBoundEuros-RatePercent.

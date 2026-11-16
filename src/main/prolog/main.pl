@@ -8,6 +8,8 @@
 
 :- use_module(library(http/json)).
 :- use_module(library(lists)).
+:- use_module(library(apply)).
+:- use_module(library(aggregate)).
 
 :- include(parameters).
 :- include(devolution).
@@ -32,7 +34,10 @@ load_facts(Stream) :-
     ).
 
 allowed_fact(estate_cents(N))   :- integer(N).
-allowed_fact(person(Id, R))     :- atom(Id), memberchk(R, [spouse, child, father, mother]).
+allowed_fact(person(Id, R))     :- atom(Id), atom(R), relation(R).
+allowed_fact(predeceased(Id))   :- atom(Id).
+allowed_fact(via(Id, Parent))   :- atom(Id), atom(Parent).
+allowed_fact(line(Id, Line))    :- atom(Id), memberchk(Line, [paternal, maternal]).
 allowed_fact(common_child(Id))  :- atom(Id).
 allowed_fact(spouse_age(Age))   :- integer(Age).
 allowed_fact(spouse_option(O))  :- memberchk(O, [usufruct, quarter]).
@@ -40,6 +45,9 @@ allowed_fact(spouse_option(O))  :- memberchk(O, [usufruct, quarter]).
 clear_facts :-
     retractall(estate_cents(_)),
     retractall(person(_, _)),
+    retractall(predeceased(_)),
+    retractall(via(_, _)),
+    retractall(line(_, _)),
     retractall(common_child(_)),
     retractall(spouse_age(_)),
     retractall(spouse_option(_)).
@@ -47,13 +55,18 @@ clear_facts :-
 % --- solving -----------------------------------------------------------------
 
 % solve(-Result): Result is a dict ready to be written as JSON.
-solve(_{status: ok, heirs: Heirs}) :-
+solve(_{status: ok, heirs: Heirs, note: Note}) :-
     validate,
     devolution(Shares),
     findall(Heir,
             ( person(Id, Relation), heir_result(Id, Relation, Shares, Heir) ),
-            Heirs).
+            Heirs),
+    (   Shares == []
+    ->  Note = "Code civil art. 724 and 811: no heir among the listed relatives, the estate goes to the State."
+    ;   Note = null
+    ).
 
+% People are named by their identifier in messages; the caller substitutes names.
 validate :-
     (   estate_cents(E), E > 0
     ->  true
@@ -63,26 +76,66 @@ validate :-
     ->  true
     ;   throw(invalid("List at least one relative."))
     ),
-    forall(member(Relation, [spouse, father, mother]), at_most_one(Relation)),
+    forall(member(Relation, [spouse, father, mother]), at_most_one_living(Relation)),
+    forall(person(Id, descendant), valid_link(Id, [child, descendant])),
+    forall(person(Id, sibling_descendant), valid_link(Id, [sibling, sibling_descendant])),
+    forall(( person(Id, Relation), needs_line(Relation) ), has_line(Id)),
+    forall(member(Line, [paternal, maternal]), at_most_two_grandparents(Line)),
     (   spouse_age(Age), ( Age < 0 ; Age > 130 )
     ->  throw(invalid("The spouse's age is not plausible."))
     ;   true
     ).
 
-at_most_one(Relation) :-
-    aggregate_all(count, person(_, Relation), Count),
+at_most_one_living(Relation) :-
+    aggregate_all(count, living(_, Relation), Count),
     (   Count =< 1
     ->  true
-    ;   format(string(Message), "There can be only one ~w.", [Relation]),
-        throw(invalid(Message))
+    ;   invalid("There can be only one living ~w.", [Relation])
     ).
 
-heir_result(Id, _, Shares, Heir) :-
+% valid_link(+Id, +ParentRelations): Id names a listed parent of the right kind,
+% and the chain of parents does not loop.
+valid_link(Id, ParentRelations) :-
+    (   via(Id, Parent), Parent \== Id, person(Parent, Relation), memberchk(Relation, ParentRelations)
+    ->  true
+    ;   invalid("~w: choose the parent through whom this person is related to the deceased.", [Id])
+    ),
+    no_loop(Id, [Id]).
+
+no_loop(Id, Seen) :-
+    (   via(Id, Parent)
+    ->  (   memberchk(Parent, Seen)
+        ->  invalid("~w: the chain of parents loops back on itself.", [Id])
+        ;   no_loop(Parent, [Parent|Seen])
+        )
+    ;   true
+    ).
+
+has_line(Id) :-
+    (   line(Id, _)
+    ->  true
+    ;   invalid("~w: say whether this relative is on the father's or the mother's side.", [Id])
+    ).
+
+at_most_two_grandparents(Line) :-
+    aggregate_all(count, ( living(G, grandparent), line(G, Line) ), Count),
+    (   Count =< 2
+    ->  true
+    ;   invalid("There can be at most two living ~w grandparents.", [Line])
+    ).
+
+invalid(Format, Arguments) :-
+    format(string(Message), Format, Arguments),
+    throw(invalid(Message)).
+
+heir_result(Id, Relation, Shares, Heir) :-
     memberchk(share(Id, Right, Fraction, Basis), Shares), !,
-    person(Id, Relation),
     share_value(Right, Fraction, Value),
-    tax(Relation, Value, tax(Allowance, Taxable, Due, TaxBasis)),
-    Net is Value - Due,
+    tax(Id, Relation, Value, Shares, tax(Status, Allowance, Taxable, Due, TaxBasis)),
+    (   Due == null
+    ->  Net = null
+    ;   Net is Value - Due
+    ),
     fraction_text(Fraction, FractionText),
     cents(Value, ValueCents),
     cents(Allowance, AllowanceCents),
@@ -90,13 +143,13 @@ heir_result(Id, _, Shares, Heir) :-
     cents(Due, DueCents),
     cents(Net, NetCents),
     Heir = _{ id: Id, heir: true, right: Right, fraction: FractionText,
-              valueCents: ValueCents, allowanceCents: AllowanceCents,
+              valueCents: ValueCents, taxStatus: Status, allowanceCents: AllowanceCents,
               taxableCents: TaxableCents, taxCents: DueCents, netCents: NetCents,
               basis: Basis, taxBasis: TaxBasis }.
 heir_result(Id, Relation, _, Heir) :-
-    exclusion_basis(Relation, Basis),
+    exclusion_basis(Id, Relation, Basis),
     Heir = _{ id: Id, heir: false, right: null, fraction: null,
-              valueCents: null, allowanceCents: null, taxableCents: null,
+              valueCents: null, taxStatus: null, allowanceCents: null, taxableCents: null,
               taxCents: null, netCents: null, basis: Basis, taxBasis: null }.
 
 fraction_text(F, Text) :-
@@ -114,8 +167,4 @@ cents(Amount, Cents) :- Cents is round(Amount).
 error_result(invalid(Message), _{status: invalid, message: Message}) :- !.
 error_result(unsupported(Message), _{status: unsupported, message: Message}) :- !.
 error_result(Error, _{status: error, message: Message}) :-
-    message_to_codes(Error, Codes),
-    string_codes(Message, Codes).
-
-message_to_codes(Error, Codes) :-
-    format(codes(Codes), "~q", [Error]).
+    format(string(Message), "~q", [Error]).

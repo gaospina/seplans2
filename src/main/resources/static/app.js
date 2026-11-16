@@ -1,19 +1,65 @@
 "use strict";
 
-const RELATIONS = { SPOUSE: "Spouse", CHILD: "Child", FATHER: "Father", MOTHER: "Mother" };
+const RELATION_GROUPS = [
+  ["Partner", {
+    SPOUSE: "Spouse",
+    PACS_PARTNER: "PACS partner",
+    COHABITANT: "Cohabitant"
+  }],
+  ["Descendants", {
+    CHILD: "Child",
+    DESCENDANT: "Grandchild or further descendant"
+  }],
+  ["Parents, brothers and sisters", {
+    FATHER: "Father",
+    MOTHER: "Mother",
+    SIBLING: "Brother / sister",
+    SIBLING_DESCENDANT: "Nephew / niece or their descendant"
+  }],
+  ["Other ascendants", {
+    GRANDPARENT: "Grandparent",
+    GREAT_GRANDPARENT: "Great-grandparent"
+  }],
+  ["Other collaterals", {
+    UNCLE_AUNT: "Uncle / aunt",
+    GREAT_UNCLE_AUNT: "Great-uncle / great-aunt",
+    FIRST_COUSIN: "First cousin",
+    COLLATERAL_5: "Other collateral, 5th degree",
+    COLLATERAL_6: "Other collateral, 6th degree"
+  }]
+];
+const RELATIONS = Object.assign({}, ...RELATION_GROUPS.map(([, relations]) => relations));
 const RIGHTS = { full: "Full ownership", usufruct: "Usufruct", bare: "Bare ownership" };
+
+// Which listed relatives can be the parent of a person related "via" someone.
+const PARENT_RELATIONS = {
+  DESCENDANT: ["CHILD", "DESCENDANT"],
+  SIBLING_DESCENDANT: ["SIBLING", "SIBLING_DESCENDANT"]
+};
+// Relatives who may be listed although they died first, because they can be represented.
+const CAN_BE_REPRESENTED = ["CHILD", "DESCENDANT", "SIBLING", "SIBLING_DESCENDANT"];
+const NEEDS_LINE = ["GRANDPARENT", "GREAT_GRANDPARENT", "UNCLE_AUNT", "GREAT_UNCLE_AUNT",
+  "FIRST_COUSIN", "COLLATERAL_5", "COLLATERAL_6"];
 
 const form = document.getElementById("form");
 const personsBody = document.querySelector("#persons tbody");
 const spouseSection = document.getElementById("spouse-section");
-const optionBlock = document.getElementById("option-block");
 const ageBlock = document.getElementById("age-block");
 const message = document.getElementById("message");
 const result = document.getElementById("result");
 const euro = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" });
 
+let nextUid = 1;
+
+function labelled(text, control, before) {
+  const label = document.createElement("label");
+  if (before) label.append(text, control); else label.append(control, " " + text);
+  return label;
+}
+
 function addPerson(relation = "CHILD", name = "") {
   const row = document.createElement("tr");
+  row.dataset.uid = String(nextUid++);
 
   const nameInput = document.createElement("input");
   nameInput.type = "text";
@@ -24,15 +70,36 @@ function addPerson(relation = "CHILD", name = "") {
   const select = document.createElement("select");
   select.className = "relation";
   select.setAttribute("aria-label", "Relationship");
-  for (const [value, label] of Object.entries(RELATIONS)) {
-    select.add(new Option(label, value, false, value === relation));
+  for (const [group, relations] of RELATION_GROUPS) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group;
+    for (const [value, label] of Object.entries(relations)) {
+      optgroup.append(new Option(label, value, false, value === relation));
+    }
+    select.append(optgroup);
   }
+
+  const predeceased = document.createElement("input");
+  predeceased.type = "checkbox";
+  predeceased.className = "predeceased";
+
+  const via = document.createElement("select");
+  via.className = "via";
+
+  const line = document.createElement("select");
+  line.className = "line";
+  line.add(new Option("Choose…", ""));
+  line.add(new Option("Father's side", "PATERNAL"));
+  line.add(new Option("Mother's side", "MATERNAL"));
 
   const common = document.createElement("input");
   common.type = "checkbox";
   common.className = "common";
   common.checked = true;
-  common.setAttribute("aria-label", "Also the spouse's child");
+
+  const none = document.createElement("span");
+  none.className = "none";
+  none.textContent = "—";
 
   const remove = document.createElement("button");
   remove.type = "button";
@@ -40,40 +107,72 @@ function addPerson(relation = "CHILD", name = "") {
   remove.textContent = "Remove";
   remove.addEventListener("click", () => { row.remove(); refresh(); });
 
-  for (const element of [nameInput, select, common, remove]) {
-    row.insertCell().append(element);
-  }
-  select.addEventListener("change", refresh);
-  common.addEventListener("change", refresh);
+  row.insertCell().append(nameInput);
+  row.insertCell().append(select);
+  const details = row.insertCell();
+  details.className = "details";
+  details.append(
+    labelled("Child of", via, true),
+    labelled("Side", line, true),
+    labelled("Died before the deceased", predeceased),
+    labelled("Also the spouse's child", common),
+    none);
+  row.insertCell().append(remove);
+
+  nameInput.addEventListener("input", refresh);
   personsBody.append(row);
   refresh();
 }
 
-function persons() {
-  return [...personsBody.rows].map(row => ({
-    name: row.querySelector(".name").value,
+function rows() {
+  return [...personsBody.rows].map((row, index) => ({
+    row,
+    uid: row.dataset.uid,
+    name: row.querySelector(".name").value.trim() || "Person " + (index + 1),
+    rawName: row.querySelector(".name").value,
     relation: row.querySelector(".relation").value,
-    commonChild: row.querySelector(".common").checked
+    predeceased: row.querySelector(".predeceased").checked,
+    via: row.querySelector(".via").value,
+    line: row.querySelector(".line").value,
+    common: row.querySelector(".common").checked
   }));
 }
 
 /** Shows only the questions that matter for the family currently listed. */
 function refresh() {
-  const list = persons();
+  const list = rows();
   const hasSpouse = list.some(p => p.relation === "SPOUSE");
-  const children = list.filter(p => p.relation === "CHILD");
-  const allCommon = children.length > 0 && children.every(p => p.commonChild);
 
-  for (const row of personsBody.rows) {
-    const isChild = row.querySelector(".relation").value === "CHILD";
-    row.querySelector(".common").hidden = !(isChild && hasSpouse);
+  for (const person of list) {
+    const { row, relation } = person;
+    const parents = PARENT_RELATIONS[relation];
+    const show = {
+      via: Boolean(parents),
+      line: NEEDS_LINE.includes(relation),
+      predeceased: CAN_BE_REPRESENTED.includes(relation),
+      common: relation === "CHILD" && hasSpouse
+    };
+
+    // Rebuild the list of possible parents, keeping the current choice if still valid.
+    const via = row.querySelector(".via");
+    const candidates = parents ? list.filter(p => p.uid !== person.uid && parents.includes(p.relation)) : [];
+    via.replaceChildren(new Option(candidates.length ? "Choose…" : "Add the parent first", ""));
+    for (const candidate of candidates) {
+      via.add(new Option(candidate.name, candidate.uid, false, candidate.uid === person.via));
+    }
+
+    for (const [name, visible] of Object.entries(show)) {
+      row.querySelector("." + name).closest("label").hidden = !visible;
+    }
+    row.querySelector(".none").hidden = Object.values(show).some(Boolean);
   }
 
-  const optionApplies = hasSpouse && allCommon;
-  const usufruct = optionApplies && form.elements.option.value === "USUFRUCT";
+  // The spouse's option exists when every child who inherits or is represented is common.
+  const represented = new Set(list.map(p => p.via).filter(Boolean));
+  const stems = list.filter(p => p.relation === "CHILD" && (!p.predeceased || represented.has(p.uid)));
+  const optionApplies = hasSpouse && stems.length > 0 && stems.every(p => p.common);
   spouseSection.hidden = !optionApplies;
-  optionBlock.hidden = !optionApplies;
-  ageBlock.hidden = !usufruct;
+  ageBlock.hidden = !(optionApplies && form.elements.option.value === "USUFRUCT");
 }
 
 function showMessage(text, kind) {
@@ -90,6 +189,7 @@ function cell(row, text, numeric) {
   const td = row.insertCell();
   td.textContent = text;
   if (numeric) td.className = "num";
+  return td;
 }
 
 function showResult(heirs) {
@@ -102,6 +202,7 @@ function showResult(heirs) {
 
   let totalTax = 0;
   let split = false;
+  let pending = false;
   for (const heir of heirs) {
     const row = body.insertRow();
     cell(row, heir.name);
@@ -110,11 +211,16 @@ function showResult(heirs) {
       cell(row, RIGHTS[heir.right]);
       cell(row, heir.fraction, true);
       cell(row, money(heir.value), true);
-      cell(row, heir.allowance === null ? "Exempt" : money(heir.allowance), true);
-      cell(row, money(heir.taxable), true);
-      cell(row, money(heir.tax), true);
-      cell(row, money(heir.net), true);
-      totalTax += heir.tax;
+      if (heir.taxStatus === "pending") {
+        cell(row, "Not computed yet", true).colSpan = 4;
+        pending = true;
+      } else {
+        cell(row, heir.taxStatus === "exempt" ? "Exempt" : money(heir.allowance), true);
+        cell(row, money(heir.taxable), true);
+        cell(row, money(heir.tax), true);
+        cell(row, money(heir.net), true);
+        totalTax += heir.tax;
+      }
       split = split || heir.right !== "full";
     } else {
       row.className = "not-heir";
@@ -131,11 +237,12 @@ function showResult(heirs) {
   const total = foot.insertRow();
   const label = total.insertCell();
   label.colSpan = 7;
-  label.textContent = "Total tax";
+  label.textContent = pending ? "Total tax computed so far" : "Total tax";
   cell(total, money(totalTax), true);
   total.insertCell();
 
   document.getElementById("valuation-note").hidden = !split;
+  document.getElementById("pending-note").hidden = !pending;
   result.hidden = false;
 }
 
@@ -144,14 +251,22 @@ async function submit(event) {
   message.hidden = true;
   result.hidden = true;
 
-  const list = persons();
+  const list = rows();
   const hasSpouse = list.some(p => p.relation === "SPOUSE");
-  const optionVisible = !spouseSection.hidden;
+  const index = new Map(list.map((p, i) => [p.uid, i]));
+  const option = form.elements.option.value;
   const age = document.getElementById("spouse-age").value;
   const request = {
     estate: document.getElementById("estate").value || null,
-    persons: list.map(p => ({ ...p, commonChild: hasSpouse && p.relation === "CHILD" && p.commonChild })),
-    spouseOption: optionVisible && form.elements.option.value ? form.elements.option.value : null,
+    persons: list.map(p => ({
+      name: p.rawName,
+      relation: p.relation,
+      alive: !(CAN_BE_REPRESENTED.includes(p.relation) && p.predeceased),
+      via: PARENT_RELATIONS[p.relation] && index.has(p.via) ? index.get(p.via) : null,
+      line: NEEDS_LINE.includes(p.relation) && p.line ? p.line : null,
+      commonChild: hasSpouse && p.relation === "CHILD" && p.common
+    })),
+    spouseOption: !spouseSection.hidden && option ? option : null,
     spouseAge: !ageBlock.hidden && age !== "" ? Number(age) : null
   };
 
@@ -165,6 +280,7 @@ async function submit(event) {
     });
     const body = await response.json();
     if (body.status === "ok") {
+      if (body.message) showMessage(body.message, "info");
       showResult(body.heirs);
     } else {
       showMessage(body.message || "The computation failed.", body.status === "unsupported" ? "info" : "error");
