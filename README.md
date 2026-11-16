@@ -8,7 +8,7 @@ See [PLAN.md](PLAN.md) for the architecture, legal scope and iteration plan.
 
 This is a prototype for exploring rule-based legal reasoning. It is not legal or tax advice.
 
-## What works today (iterations 1 and 2)
+## What works today (iterations 1 to 3)
 
 Intestate devolution for the whole family, in the order set by the Code civil:
 
@@ -29,11 +29,23 @@ Intestate devolution for the whole family, in the order set by the Code civil:
 
 PACS partners and cohabitants can be listed and are reported as not inheriting.
 
-Tax: the spouse is exempt; children, their representatives, parents and other ascendants
-are taxed on the direct-line scale after the 100 000 € allowance (representatives share the
-allowance of the child they represent). Under the usufruct option, shares are valued with
-the CGI art. 669 scale from the spouse's age. Tax between brothers, sisters and other
-collaterals is **not computed yet** and is reported as such.
+Inheritance tax for every heir:
+
+| Heir | Allowance | Rate |
+|---|---|---|
+| Spouse | — | Exempt |
+| Children, parents, grandparents | 100 000 € | Direct-line scale, 5 % to 45 % |
+| Descendants representing a child | That child's 100 000 €, shared | Direct-line scale |
+| Brother or sister | 15 932 € | 35 % up to 24 430 €, 45 % beyond; exempt under the conditions of CGI art. 796-0 ter |
+| Nephews and nieces representing a sibling, several stems | That sibling's 15 932 €, shared | Sibling scale |
+| Nephews and nieces of an only sibling | 7 967 € each | 55 % |
+| Other relatives up to the 4th degree | 1 594 € | 55 % |
+| Relatives of the 5th and 6th degree | 1 594 € | 60 % |
+| Any disabled heir | + 159 325 € | — |
+
+Under the usufruct option, shares are valued with the CGI art. 669 scale from the spouse's
+age. Figures were checked against service-public.gouv.fr on 2026-11-16. Prior gifts, tax
+reductions and the administration's rounding rules are not taken into account.
 
 ## Requirements
 
@@ -106,8 +118,9 @@ identified by generated ids.
 
 Per person: `relation` (see `Relation.java`), `alive` (default true), `via` (position in the
 list, from 0, of the parent of a `DESCENDANT` or `SIBLING_DESCENDANT`), `line` (`PATERNAL`
-or `MATERNAL`, for grandparents and other collaterals) and `commonChild`.
+or `MATERNAL`, for grandparents and other collaterals), `commonChild`, `disabled` and, for
+a sibling, `siblingExemption`.
 
 The response has a `status` (`ok`, `invalid`, `error`), a `message`, and one entry per
-person in `heirs` with the right, fraction, value, `taxStatus` (`exempt`, `computed` or
-`pending`), allowance, taxable amount, tax, net amount and the legal basis.
+person in `heirs` with the right, fraction, value, `taxStatus` (`exempt` or `computed`),
+allowance, taxable amount, tax, net amount and the legal basis.

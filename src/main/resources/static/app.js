@@ -38,6 +38,8 @@ const PARENT_RELATIONS = {
 };
 // Relatives who may be listed although they died first, because they can be represented.
 const CAN_BE_REPRESENTED = ["CHILD", "DESCENDANT", "SIBLING", "SIBLING_DESCENDANT"];
+// Relatives who never inherit without a will, or never pay tax: no tax questions for them.
+const NO_TAX_QUESTIONS = ["SPOUSE", "PACS_PARTNER", "COHABITANT"];
 const NEEDS_LINE = ["GRANDPARENT", "GREAT_GRANDPARENT", "UNCLE_AUNT", "GREAT_UNCLE_AUNT",
   "FIRST_COUSIN", "COLLATERAL_5", "COLLATERAL_6"];
 
@@ -97,6 +99,14 @@ function addPerson(relation = "CHILD", name = "") {
   common.className = "common";
   common.checked = true;
 
+  const disabled = document.createElement("input");
+  disabled.type = "checkbox";
+  disabled.className = "disabled";
+
+  const exempt = document.createElement("input");
+  exempt.type = "checkbox";
+  exempt.className = "exempt";
+
   const none = document.createElement("span");
   none.className = "none";
   none.textContent = "—";
@@ -116,7 +126,13 @@ function addPerson(relation = "CHILD", name = "") {
     labelled("Side", line, true),
     labelled("Died before the deceased", predeceased),
     labelled("Also the spouse's child", common),
+    labelled("Disabled", disabled),
+    labelled("Lived with the deceased (tax exemption)", exempt),
     none);
+  disabled.closest("label").title =
+    "Unable to work in normal conditions because of a physical or mental impairment: adds a 159 325 € allowance (CGI art. 779 II).";
+  exempt.closest("label").title =
+    "Exempt if all three hold at the death: single, widowed, divorced or separated; over 50 or unable to work; lived with the deceased for the previous five years (CGI art. 796-0 ter).";
   row.insertCell().append(remove);
 
   nameInput.addEventListener("input", refresh);
@@ -134,7 +150,9 @@ function rows() {
     predeceased: row.querySelector(".predeceased").checked,
     via: row.querySelector(".via").value,
     line: row.querySelector(".line").value,
-    common: row.querySelector(".common").checked
+    common: row.querySelector(".common").checked,
+    disabled: row.querySelector(".disabled").checked,
+    exempt: row.querySelector(".exempt").checked
   }));
 }
 
@@ -150,7 +168,9 @@ function refresh() {
       via: Boolean(parents),
       line: NEEDS_LINE.includes(relation),
       predeceased: CAN_BE_REPRESENTED.includes(relation),
-      common: relation === "CHILD" && hasSpouse
+      common: relation === "CHILD" && hasSpouse,
+      disabled: !NO_TAX_QUESTIONS.includes(relation) && !person.predeceased,
+      exempt: relation === "SIBLING" && !person.predeceased
     };
 
     // Rebuild the list of possible parents, keeping the current choice if still valid.
@@ -202,7 +222,6 @@ function showResult(heirs) {
 
   let totalTax = 0;
   let split = false;
-  let pending = false;
   for (const heir of heirs) {
     const row = body.insertRow();
     cell(row, heir.name);
@@ -211,16 +230,11 @@ function showResult(heirs) {
       cell(row, RIGHTS[heir.right]);
       cell(row, heir.fraction, true);
       cell(row, money(heir.value), true);
-      if (heir.taxStatus === "pending") {
-        cell(row, "Not computed yet", true).colSpan = 4;
-        pending = true;
-      } else {
-        cell(row, heir.taxStatus === "exempt" ? "Exempt" : money(heir.allowance), true);
-        cell(row, money(heir.taxable), true);
-        cell(row, money(heir.tax), true);
-        cell(row, money(heir.net), true);
-        totalTax += heir.tax;
-      }
+      cell(row, heir.taxStatus === "exempt" ? "Exempt" : money(heir.allowance), true);
+      cell(row, money(heir.taxable), true);
+      cell(row, money(heir.tax), true);
+      cell(row, money(heir.net), true);
+      totalTax += heir.tax;
       split = split || heir.right !== "full";
     } else {
       row.className = "not-heir";
@@ -237,12 +251,11 @@ function showResult(heirs) {
   const total = foot.insertRow();
   const label = total.insertCell();
   label.colSpan = 7;
-  label.textContent = pending ? "Total tax computed so far" : "Total tax";
+  label.textContent = "Total tax";
   cell(total, money(totalTax), true);
   total.insertCell();
 
   document.getElementById("valuation-note").hidden = !split;
-  document.getElementById("pending-note").hidden = !pending;
   result.hidden = false;
 }
 
@@ -264,7 +277,9 @@ async function submit(event) {
       alive: !(CAN_BE_REPRESENTED.includes(p.relation) && p.predeceased),
       via: PARENT_RELATIONS[p.relation] && index.has(p.via) ? index.get(p.via) : null,
       line: NEEDS_LINE.includes(p.relation) && p.line ? p.line : null,
-      commonChild: hasSpouse && p.relation === "CHILD" && p.common
+      commonChild: hasSpouse && p.relation === "CHILD" && p.common,
+      disabled: !NO_TAX_QUESTIONS.includes(p.relation) && !p.predeceased && p.disabled,
+      siblingExemption: p.relation === "SIBLING" && !p.predeceased && p.exempt
     })),
     spouseOption: !spouseSection.hidden && option ? option : null,
     spouseAge: !ageBlock.hidden && age !== "" ? Number(age) : null

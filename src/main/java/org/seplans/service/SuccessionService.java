@@ -104,6 +104,12 @@ public class SuccessionService {
 			if (person.isCommonChild()) {
 				facts.append("common_child(").append(id).append(").\n");
 			}
+			if (person.isDisabled()) {
+				facts.append("disabled(").append(id).append(").\n");
+			}
+			if (person.isExemptSibling()) {
+				facts.append("exempt_sibling(").append(id).append(").\n");
+			}
 		}
 		if (request.spouseAge() != null) {
 			facts.append("spouse_age(").append(request.spouseAge().intValue()).append(").\n");

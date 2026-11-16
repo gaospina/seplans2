@@ -4,12 +4,12 @@ import java.math.BigDecimal;
 
 /**
  * Outcome for one listed person. Amounts are in euros and null when they do not apply
- * (person is not an heir, is exempt from tax, or the tax is not computed yet).
+ * (person is not an heir, or is exempt from tax).
  *
  * @param right     full, usufruct or bare (bare ownership)
  * @param fraction  fraction of the estate the right bears on, e.g. "3/8"
  * @param value     value of the share; for usufruct and bare ownership, the fiscal valuation
- * @param taxStatus exempt, computed, or pending (tax for this relationship is not computed yet)
+ * @param taxStatus exempt or computed
  * @param basis     the rule that gave or denied the share
  * @param taxBasis  the rule that set the tax
  */

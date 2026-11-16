@@ -1,16 +1,23 @@
 % Amounts and rates of French inheritance law used by the rules.
 % Every figure is in euros or percent and names its legal source.
-% Figures as in force for deaths in 2026; check Legifrance before relying on them.
+%
+% Checked on 2026-11-16 against service-public.gouv.fr, pages F35794 (verified
+% by the administration on 2026-08-19) and F934 (verified on 2026-07-03).
 
 % allowance(+Category, -Euros)
-% CGI art. 779 I: allowance in direct line (children and their representatives,
-% father, mother and other ascendants).
-allowance(direct_line, 100000).
+allowance(direct_line,  100000).   % CGI art. 779 I: children and their representatives, ascendants
+allowance(sibling,       15932).   % CGI art. 779 IV: brothers and sisters
+allowance(nephew_niece,   7967).   % CGI art. 779 V: nephews and nieces
+allowance(default,        1594).   % CGI art. 788 IV: when no other allowance applies
+allowance(disability,   159325).   % CGI art. 779 II: disabled heir, added to the others
 
-% direct_line_scale(-Brackets)
-% CGI art. 777, table I. Each bracket is UpperBoundEuros-RatePercent.
-direct_line_scale([ 8072-5, 12109-10, 15932-15, 552324-20,
-                    902838-30, 1805677-40, inf-45 ]).
+% scale(+Category, -Brackets)
+% CGI art. 777. Each bracket is UpperBoundEuros-RatePercent.
+scale(direct_line, [ 8072-5, 12109-10, 15932-15, 552324-20,
+                     902838-30, 1805677-40, inf-45 ]).
+scale(sibling,     [ 24430-35, inf-45 ]).
+scale(fourth_degree, [ inf-55 ]).  % relatives up to the fourth degree inclusive
+scale(remote,        [ inf-60 ]).  % relatives beyond the fourth degree
 
 % usufruct_scale(-Brackets)
 % CGI art. 669 I: value of the usufruct as a percentage of full ownership,

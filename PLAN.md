@@ -4,7 +4,7 @@ Prototype web application that computes how a French estate is split between hei
 and the inheritance tax each heir owes. The legal reasoning lives in Prolog; Spring Boot
 provides the web layer and a bridge to the Prolog engine.
 
-Status: iterations 1 and 2 are implemented (see README.md for what works). Iterations 3–5
+Status: iterations 1 to 3 are implemented (see README.md for what works). Iterations 4 and 5
 are not started.
 
 ## 1. Architecture
@@ -58,7 +58,8 @@ taking the place of a predeceased child) and the paternal/maternal split need to
 - for a child: `commonChild` — whether the child is also the surviving spouse's child
 - for the succession: `spouseAge`, and `spouseOption` (usufruct or quarter) when all
   children are common
-- later iterations: `disabled`, `renounces`
+- `disabled` (disability allowance) and, for a sibling, `siblingExemption`
+- later iterations: `renounces`
 
 The service turns this into Prolog facts (`estate_cents/1`, `person/2`, `predeceased/1`,
 `via/2`, `line/2`, `common_child/1`, `spouse_age/1`, `spouse_option/1`), and the rules
@@ -92,8 +93,9 @@ regime, life insurance, the spouse's housing rights (art. 763–764), the siblin
 return on family property (art. 757-3), unworthiness, simple adoption, international
 successions.
 
-All amounts and rates go in `parameters.pl` with their source and date and must be
-checked against the current texts on Légifrance before being relied on.
+All amounts and rates are in `parameters.pl` with their source and the date they were
+checked. Out of scope for tax: prior gifts, tax reductions, and the rounding rules applied
+by the administration.
 
 ## 3. Iterations
 
@@ -127,7 +129,11 @@ direct-line heir (representatives share the allowance of the child they represen
 brothers, sisters and other collaterals it is reported as "not computed yet" until iteration 3.
 
 **3 — Complete tax computation**: every category, allowances, exemptions, disability,
-representation. Reference cases checked against the official simulator on impots.gouv.fr.
+representation. The figures in `parameters.pl` and three worked examples were checked against
+service-public.gouv.fr (page F35794); the official simulator on impots.gouv.fr was not used.
+One rule rests on doctrine rather than on that page and should be confirmed: nephews and
+nieces are taxed as the brother or sister they represent only when there are several stems;
+descending from the deceased's only sibling, they are taxed at 55 % with their own allowance.
 
 **4 — Explanations and usability**: reasons shown per heir with the article cited; input
 validation and clear errors (inconsistent family, missing `via`); cleaner UI.

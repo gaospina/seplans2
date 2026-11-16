@@ -39,6 +39,8 @@ allowed_fact(predeceased(Id))   :- atom(Id).
 allowed_fact(via(Id, Parent))   :- atom(Id), atom(Parent).
 allowed_fact(line(Id, Line))    :- atom(Id), memberchk(Line, [paternal, maternal]).
 allowed_fact(common_child(Id))  :- atom(Id).
+allowed_fact(disabled(Id))      :- atom(Id).
+allowed_fact(exempt_sibling(Id)) :- atom(Id).
 allowed_fact(spouse_age(Age))   :- integer(Age).
 allowed_fact(spouse_option(O))  :- memberchk(O, [usufruct, quarter]).
 
@@ -49,6 +51,8 @@ clear_facts :-
     retractall(via(_, _)),
     retractall(line(_, _)),
     retractall(common_child(_)),
+    retractall(disabled(_)),
+    retractall(exempt_sibling(_)),
     retractall(spouse_age(_)),
     retractall(spouse_option(_)).
 
@@ -132,10 +136,7 @@ heir_result(Id, Relation, Shares, Heir) :-
     memberchk(share(Id, Right, Fraction, Basis), Shares), !,
     share_value(Right, Fraction, Value),
     tax(Id, Relation, Value, Shares, tax(Status, Allowance, Taxable, Due, TaxBasis)),
-    (   Due == null
-    ->  Net = null
-    ;   Net is Value - Due
-    ),
+    Net is Value - Due,
     fraction_text(Fraction, FractionText),
     cents(Value, ValueCents),
     cents(Allowance, AllowanceCents),

@@ -389,9 +389,104 @@ test(grandparent_taxed_in_direct_line) :-
     with_facts([ estate_cents(30000000), person(g, grandparent), line(g, paternal) ], R),
     heir(R, g, G), G.taxStatus == computed, G.taxCents =:= 3819435.
 
-test(collateral_tax_is_pending) :-
-    with_facts([ estate_cents(30000000), person(s, sibling) ], R),
-    heir(R, s, S), S.taxStatus == pending, S.taxCents == null, S.netCents == null,
-    S.valueCents =:= 30000000.
-
 :- end_tests(tax).
+
+:- begin_tests(collateral_tax).
+
+test(sibling_scale) :-
+    % 300 000 - 15 932 = 284 068 taxable:
+    % 24 430 x 35 % = 8 550.50, 259 638 x 45 % = 116 837.10, total 125 387.60
+    with_facts([ estate_cents(30000000), person(s, sibling) ], R),
+    heir(R, s, S), S.taxStatus == computed,
+    S.allowanceCents =:= 1593200, S.taxableCents =:= 28406800,
+    S.taxCents =:= 12538760, S.netCents =:= 17461240.
+
+test(sibling_below_first_bracket) :-
+    % 30 000 - 15 932 = 14 068 x 35 % = 4 923.80
+    with_facts([ estate_cents(3000000), person(s, sibling) ], R),
+    heir(R, s, S), S.taxCents =:= 492380.
+
+test(exempt_sibling) :-
+    with_facts([ estate_cents(30000000), person(s, sibling), exempt_sibling(s),
+                 person(t, sibling) ], R),
+    heir(R, s, S), S.taxStatus == exempt, S.taxCents =:= 0, S.netCents =:= 15000000,
+    heir(R, t, T), T.taxStatus == computed, T.taxCents > 0.
+
+test(nephews_by_representation_taxed_as_siblings) :-
+    % Two stems. n1 and n2 receive 100 000 each and share s2's allowance:
+    % 100 000 - 7 966 = 92 034 taxable, 8 550.50 + 67 604 x 45 % = 38 972.30
+    with_facts([ estate_cents(40000000), person(s1, sibling),
+                 person(s2, sibling), predeceased(s2),
+                 person(n1, sibling_descendant), via(n1, s2),
+                 person(n2, sibling_descendant), via(n2, s2) ], R),
+    heir(R, n1, N), N.allowanceCents =:= 796600, N.taxableCents =:= 9203400,
+    N.taxCents =:= 3897230.
+
+test(nephew_of_single_stem_taxed_as_nephew) :-
+    % 100 000 - 7 967 = 92 033 x 55 % = 50 618.15
+    with_facts([ estate_cents(10000000),
+                 person(s, sibling), predeceased(s),
+                 person(n, sibling_descendant), via(n, s) ], R),
+    heir(R, n, N), N.allowanceCents =:= 796700, N.taxCents =:= 5061815.
+
+test(grand_nephew_of_single_stem) :-
+    % Fourth degree: 100 000 - 1 594 = 98 406 x 55 % = 54 123.30
+    with_facts([ estate_cents(10000000),
+                 person(s, sibling), predeceased(s),
+                 person(n, sibling_descendant), via(n, s), predeceased(n),
+                 person(g, sibling_descendant), via(g, n) ], R),
+    heir(R, g, G), G.allowanceCents =:= 159400, G.taxCents =:= 5412330.
+
+test(uncle_taxed_at_55_percent) :-
+    % 200 000 - 1 594 = 198 406 x 55 % = 109 123.30
+    with_facts([ estate_cents(20000000), person(u, uncle_aunt), line(u, paternal) ], R),
+    heir(R, u, U), U.taxCents =:= 10912330.
+
+test(first_cousin_taxed_at_55_percent) :-
+    with_facts([ estate_cents(20000000), person(c, first_cousin), line(c, maternal) ], R),
+    heir(R, c, C), C.taxCents =:= 10912330.
+
+test(fifth_degree_taxed_at_60_percent) :-
+    % 198 406 x 60 % = 119 043.60
+    with_facts([ estate_cents(20000000), person(c, collateral_5), line(c, maternal) ], R),
+    heir(R, c, C), C.taxCents =:= 11904360.
+
+:- end_tests(collateral_tax).
+
+:- begin_tests(disability).
+
+% The three cases below are the worked examples of service-public.gouv.fr (F35794).
+
+test(official_example_disabled_child) :-
+    % 300 000 - 259 325 = 40 675 taxable, duty 6 329.35
+    with_facts([ estate_cents(30000000), person(a, child), disabled(a) ], R),
+    heir(R, a, A), A.allowanceCents =:= 25932500, A.taxableCents =:= 4067500,
+    A.taxCents =:= 632935.
+
+test(official_example_child) :-
+    % 150 000 - 100 000 = 50 000 taxable, duty 8 194.35
+    with_facts([ estate_cents(15000000), person(a, child) ], R),
+    heir(R, a, A), A.taxableCents =:= 5000000, A.taxCents =:= 819435.
+
+test(official_example_disabled_sibling) :-
+    % 200 000 - 175 257 = 24 743 taxable, duty 8 691.35
+    with_facts([ estate_cents(20000000), person(s, sibling), disabled(s) ], R),
+    heir(R, s, S), S.allowanceCents =:= 17525700, S.taxableCents =:= 2474300,
+    S.taxCents =:= 869135.
+
+test(disabled_representative_adds_allowance_to_shared_one) :-
+    % g1 receives 150 000; allowance 50 000 (shared) + 159 325 caps at the share.
+    with_facts([ estate_cents(60000000), person(a, child),
+                 person(b, child), predeceased(b),
+                 person(g1, descendant), via(g1, b), disabled(g1),
+                 person(g2, descendant), via(g2, b) ], R),
+    heir(R, g1, G1), G1.allowanceCents =:= 15000000, G1.taxCents =:= 0,
+    heir(R, g2, G2), G2.allowanceCents =:= 5000000.
+
+test(disabled_cousin) :-
+    % 200 000 - (1 594 + 159 325) = 39 081 x 55 % = 21 494.55
+    with_facts([ estate_cents(20000000), person(c, first_cousin), line(c, maternal),
+                 disabled(c) ], R),
+    heir(R, c, C), C.taxCents =:= 2149455.
+
+:- end_tests(disability).

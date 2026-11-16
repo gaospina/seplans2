@@ -108,20 +108,35 @@ class SuccessionApiTest {
 	}
 
 	@Test
-	void collateralsSplitBetweenLinesWithTaxPending() throws Exception {
+	void collateralsSplitBetweenLinesAndAreTaxed() throws Exception {
 		HttpResponse<String> response = post("""
 				{"estate": 400000, "persons": [
 				  {"name": "Paul", "relation": "UNCLE_AUNT", "line": "PATERNAL"},
-				  {"name": "Lea", "relation": "FIRST_COUSIN", "line": "MATERNAL"},
+				  {"name": "Lea", "relation": "FIRST_COUSIN", "line": "MATERNAL", "disabled": true},
 				  {"name": "Max", "relation": "PACS_PARTNER"}]}
 				""");
 		assertEquals(200, response.statusCode(), response.body());
 		JsonNode heirs = json.readTree(response.body()).get("heirs");
 		assertEquals("1/2", heirs.get(0).get("fraction").asString());
-		assertEquals("pending", heirs.get(0).get("taxStatus").asString());
-		assertTrue(heirs.get(0).get("tax").isNull());
+		assertEquals("computed", heirs.get(0).get("taxStatus").asString());
+		assertEquals(0, heirs.get(0).get("tax").decimalValue().compareTo(new java.math.BigDecimal("109123.30")));
 		assertEquals("1/2", heirs.get(1).get("fraction").asString());
+		assertEquals(0, heirs.get(1).get("tax").decimalValue().compareTo(new java.math.BigDecimal("21494.55")));
 		assertFalse(heirs.get(2).get("heir").asBoolean());
+	}
+
+	@Test
+	void siblingExemptionAndSiblingScale() throws Exception {
+		HttpResponse<String> response = post("""
+				{"estate": 600000, "persons": [
+				  {"name": "Marc", "relation": "SIBLING", "siblingExemption": true},
+				  {"name": "Eve", "relation": "SIBLING"}]}
+				""");
+		assertEquals(200, response.statusCode(), response.body());
+		JsonNode heirs = json.readTree(response.body()).get("heirs");
+		assertEquals("exempt", heirs.get(0).get("taxStatus").asString());
+		assertEquals(0, heirs.get(0).get("tax").decimalValue().signum());
+		assertEquals(0, heirs.get(1).get("tax").decimalValue().compareTo(new java.math.BigDecimal("125387.60")));
 	}
 
 	@Test
