@@ -8,7 +8,7 @@ See [PLAN.md](PLAN.md) for the architecture, legal scope and iteration plan.
 
 This is a prototype for exploring rule-based legal reasoning. It is not legal or tax advice.
 
-## What works today (iterations 1 to 4)
+## What works today (iterations 1 to 5)
 
 The page lists the relatives, checks the input, and shows for each person the share, the
 tax and how every amount was reached: the rule and article applied, the allowances, and
@@ -67,14 +67,35 @@ Maven is not needed: the Maven Wrapper downloads it on first use.
 
 then open http://localhost:8080. On Windows use `mvnw.cmd`.
 
+Or with Docker, which needs neither Java nor SWI-Prolog on the machine:
+
+```
+docker build -t seplans2 .
+docker run --rm -p 8080:8080 seplans2
+```
+
+`GET /api/health` says whether the rule engine can be run.
+
+## Configuration
+
+Set in `application.properties`, or as environment variables (`SEPLANS_SWIPL_TIMEOUT=5s`):
+
+| Property | Default | Meaning |
+|---|---|---|
+| `seplans.swipl.command` | `swipl` | Command that starts SWI-Prolog |
+| `seplans.swipl.timeout` | `10s` | Time allowed for one computation, including the wait for a free slot |
+| `seplans.swipl.max-concurrent` | `4` | SWI-Prolog processes allowed to run at the same time |
+| `seplans.swipl.stack-limit` | `256m` | Memory limit of the Prolog stacks of one process |
+
 ## Test
 
 ```
 ./mvnw test
 ```
 
-runs the Prolog reference cases (`src/test/prolog`, plunit) and the end-to-end API tests,
-which go through a real `swipl` process. The Prolog suite can also be run alone:
+runs the Prolog reference cases (`src/test/prolog`, plunit), the tests of the bridge, and
+the end-to-end API tests, which go through a real `swipl` process. GitHub Actions runs the
+same on every push, then builds the Docker image and computes one succession in it. The Prolog suite can also be run alone:
 
 ```
 swipl -q -g run_tests -t halt src/test/prolog/succession_tests.pl

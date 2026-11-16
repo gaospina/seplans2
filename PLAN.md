@@ -4,8 +4,8 @@ Prototype web application that computes how a French estate is split between hei
 and the inheritance tax each heir owes. The legal reasoning lives in Prolog; Spring Boot
 provides the web layer and a bridge to the Prolog engine.
 
-Status: iterations 1 to 4 are implemented (see README.md for what works). Iteration 5 is
-not started.
+Status: iterations 1 to 5 are implemented (see README.md for what works). What remains is
+listed under "Later" and in the out-of-scope list of section 2.
 
 ## 1. Architecture
 
@@ -32,7 +32,7 @@ Prolog (src/main/prolog)
 | Topic | Choice | Reason |
 |---|---|---|
 | Prolog system | SWI-Prolog (10.0.0 is installed locally) | Mature, built-in JSON, rationals for exact fractions, `plunit` for tests |
-| Bridge | `swipl` launched as a subprocess per request, JSON on stdout, hidden behind a `PrologEngine` interface | No JNI or native-library path setup, no shared mutable Prolog state between requests, easy to test. JPL (in-process) can replace it later behind the same interface if latency matters |
+| Bridge | `swipl` launched as a subprocess per request, JSON on stdout, hidden behind a `PrologEngine` interface | No JNI or native-library path setup, no shared mutable Prolog state between requests, easy to test. Costs roughly 0.1–0.3 s per request for process start-up. JPL (in-process) can replace it later behind the same interface if latency matters |
 | Build | Maven via the Maven Wrapper (`mvnw`) | Neither Maven nor Gradle is installed; the wrapper needs only the JDK |
 | Java / Spring | Java 25 (installed), Spring Boot 4.x | Current LTS and current Boot line |
 | Frontend | One static HTML page + plain JavaScript calling the REST API | "Simple frontend"; no Node toolchain. Can be swapped for a richer UI later without touching the backend |
@@ -141,8 +141,12 @@ bracket), all produced by the rule base; warnings for input that is accepted but
 effect; problems the page can see are flagged on the field before anything is sent, the
 rest come back from the rules with the names typed; ready-made example families.
 
-**5 — Hardening**: timeouts and error handling on the Prolog process, GitHub Actions
-(JDK + SWI-Prolog), packaging (Docker image containing both runtimes).
+**5 — Hardening**: each SWI-Prolog process is limited in time, memory and output, ignores
+user init files, and only a fixed number run at once; a missing or failing engine is
+reported at startup, by `GET /api/health`, and as HTTP 503. GitHub Actions runs the Prolog
+cases and the Maven build with SWI-Prolog installed, then builds the Docker image and
+computes one succession in the container. The image holds a Java runtime and SWI-Prolog and
+runs as an unprivileged user.
 
 **Later**: wills and gifts, reserved portion, JPL engine, family-tree editor.
 

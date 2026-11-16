@@ -11,4 +11,11 @@ public interface PrologEngine {
 	 * @throws PrologEngineException if the engine could not be run or gave no answer
 	 */
 	String solve(String facts);
+
+	/**
+	 * Describes the Prolog system in use; doubles as a check that it can be run.
+	 *
+	 * @throws PrologEngineException if the engine could not be run
+	 */
+	String version();
 }

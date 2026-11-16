@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Install SWI-Prolog
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends swi-prolog-nox
+          swipl --version
+
+      - name: Prolog reference cases
+        run: swipl -q -g run_tests -t halt src/test/prolog/succession_tests.pl
+
+      - name: Build and run all tests
+        run: ./mvnw -B verify
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t seplans2 .
+
+      - name: Start the container and compute one succession
+        run: |
+          docker run -d --name seplans2 -p 8080:8080 seplans2
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/api/health; then break; fi
+            sleep 2
+          done
+          echo
+          curl -fsS -X POST http://localhost:8080/api/succession \
+            -H 'Content-Type: application/json' \
+            -d '{"estate": 150000, "persons": [{"name": "Luc", "relation": "CHILD"}]}' \
+            | tee result.json
+          echo
+          grep -q '"tax":8194.35' result.json
+
+      - name: Container logs
+        if: always()
+        run: docker logs seplans2

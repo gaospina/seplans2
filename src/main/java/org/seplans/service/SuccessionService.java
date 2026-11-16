@@ -27,6 +27,7 @@ public class SuccessionService {
 
 	private static final BigDecimal MAX_ESTATE = new BigDecimal("1000000000000");
 	private static final int MAX_PERSONS = 100;
+	private static final int MAX_NAME_LENGTH = 100;
 	private static final Pattern PERSON_ID = Pattern.compile("\\bp(\\d+)\\b");
 
 	private final PrologEngine engine;
@@ -128,7 +129,11 @@ public class SuccessionService {
 
 	private static String name(List<PersonInput> persons, int index) {
 		String name = persons.get(index).name();
-		return name == null || name.isBlank() ? "Person " + (index + 1) : name.strip();
+		if (name == null || name.isBlank()) {
+			return "Person " + (index + 1);
+		}
+		name = name.strip();
+		return name.length() > MAX_NAME_LENGTH ? name.substring(0, MAX_NAME_LENGTH) : name;
 	}
 
 	/** The rule base names people by identifier; show the names the user typed instead. */

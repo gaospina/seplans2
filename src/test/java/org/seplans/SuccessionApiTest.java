@@ -194,6 +194,16 @@ class SuccessionApiTest {
 	}
 
 	@Test
+	void healthReportsTheEngine() throws Exception {
+		HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/health")).build();
+		HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+		assertEquals(200, response.statusCode(), response.body());
+		JsonNode body = json.readTree(response.body());
+		assertEquals("ok", body.get("status").asString());
+		assertTrue(body.get("engine").asString().contains("SWI-Prolog"));
+	}
+
+	@Test
 	void malformedRequestIsRejected() throws Exception {
 		assertEquals(400, post("{\"estate\": \"abc\"}").statusCode());
 		assertEquals(400, post("{\"estate\": 1000, \"persons\": [{\"relation\": \"COUSIN\"}]}").statusCode());
